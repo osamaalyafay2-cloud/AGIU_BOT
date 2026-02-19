@@ -15,7 +15,7 @@ def has_level_access(conn, level_id):
 
     allowed = conn.execute("""
         SELECT 1 FROM user_permissions
-        WHERE user_id=? AND level_id=?
+        WHERE user_id=%s AND level_id=%s
     """, (session.get("user_id"), level_id)).fetchone()
 
     return allowed is not None
@@ -33,7 +33,7 @@ def view_level(id):
     conn = get_db()
 
     level = conn.execute(
-        "SELECT * FROM levels WHERE id=?",
+        "SELECT * FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -47,7 +47,7 @@ def view_level(id):
         return "غير مصرح لك"
 
     subjects = conn.execute(
-        "SELECT * FROM subjects WHERE level_id=?",
+        "SELECT * FROM subjects WHERE level_id=%s",
         (id,)
     ).fetchall()
 
@@ -90,7 +90,7 @@ def add_subject(id):
     conn = get_db()
 
     level = conn.execute(
-        "SELECT * FROM levels WHERE id=?",
+        "SELECT * FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -112,7 +112,7 @@ def add_subject(id):
             return "يجب إدخال اسم المادة"
 
         conn.execute(
-            "INSERT INTO subjects(name, level_id) VALUES(?,?)",
+            "INSERT INTO subjects(name, level_id) VALUES(%s,%s)",
             (name, id)
         )
 
@@ -145,7 +145,7 @@ def edit_subject(id):
     conn = get_db()
 
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -167,7 +167,7 @@ def edit_subject(id):
             return "يجب إدخال اسم المادة"
 
         conn.execute(
-            "UPDATE subjects SET name=? WHERE id=?",
+            "UPDATE subjects SET name=%s WHERE id=%s",
             (name, id)
         )
 
@@ -199,7 +199,7 @@ def delete_subject(id):
     conn = get_db()
 
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -213,7 +213,7 @@ def delete_subject(id):
         return "غير مصرح لك"
 
     conn.execute(
-        "DELETE FROM subjects WHERE id=?",
+        "DELETE FROM subjects WHERE id=%s",
         (id,)
     )
 

@@ -127,19 +127,19 @@ def check_user_permission(department_id=None, year_id=None, level_id=None):
 
     conn = get_db()
 
-    query = "SELECT * FROM user_permissions WHERE user_id=?"
+    query = "SELECT * FROM user_permissions WHERE user_id=%s"
     params = [user_id]
 
     if department_id:
-        query += " AND department_id=?"
+        query += " AND department_id=%s"
         params.append(department_id)
 
     if year_id:
-        query += " AND year_id=?"
+        query += " AND year_id=%s"
         params.append(year_id)
 
     if level_id:
-        query += " AND level_id=?"
+        query += " AND level_id=%s"
         params.append(level_id)
 
     row = conn.execute(query, params).fetchone()
@@ -159,7 +159,7 @@ def has_permission(user_id, level_id):
     row = conn.execute("""
         SELECT *
         FROM user_permissions
-        WHERE user_id=? AND level_id=?
+        WHERE user_id=%s AND level_id=%s
     """, (user_id, level_id)).fetchone()
 
     conn.close()

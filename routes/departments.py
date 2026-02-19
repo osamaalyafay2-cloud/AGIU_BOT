@@ -20,7 +20,7 @@ def has_department_access(conn, department_id):
     allowed = conn.execute("""
         SELECT 1
         FROM user_permissions
-        WHERE user_id=? AND department_id=?
+        WHERE user_id=%s AND department_id=%s
     """, (session.get("user_id"), department_id)).fetchone()
 
     return allowed is not None
@@ -39,7 +39,7 @@ def view_college(id):
     conn = get_db()
 
     college = conn.execute(
-        "SELECT * FROM colleges WHERE id=?",
+        "SELECT * FROM colleges WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -50,7 +50,7 @@ def view_college(id):
     # جلب الأقسام
     if is_admin():
         departments = conn.execute(
-            "SELECT * FROM departments WHERE college_id=?",
+            "SELECT * FROM departments WHERE college_id=%s",
             (id,)
         ).fetchall()
     else:
@@ -58,7 +58,7 @@ def view_college(id):
             SELECT DISTINCT d.*
             FROM departments d
             JOIN user_permissions up ON up.department_id=d.id
-            WHERE d.college_id=? AND up.user_id=?
+            WHERE d.college_id=%s AND up.user_id=%s
         """, (id, session["user_id"])).fetchall()
 
     conn.close()
@@ -112,7 +112,7 @@ def view_department(id):
     conn = get_db()
 
     department = conn.execute(
-        "SELECT * FROM departments WHERE id=?",
+        "SELECT * FROM departments WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -125,7 +125,7 @@ def view_department(id):
         return "غير مصرح لك"
 
     years = conn.execute(
-        "SELECT * FROM years WHERE department_id=?",
+        "SELECT * FROM years WHERE department_id=%s",
         (id,)
     ).fetchall()
 
@@ -191,7 +191,7 @@ def add_department(id):
             return "يجب إدخال اسم القسم"
 
         conn.execute(
-            "INSERT INTO departments(name,college_id) VALUES(?,?)",
+            "INSERT INTO departments(name,college_id) VALUES(%s,%s)",
             (name, id)
         )
 
@@ -228,7 +228,7 @@ def edit_department(id):
     conn = get_db()
 
     dept = conn.execute(
-        "SELECT * FROM departments WHERE id=?",
+        "SELECT * FROM departments WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -245,7 +245,7 @@ def edit_department(id):
             return "يجب إدخال الاسم"
 
         conn.execute(
-            "UPDATE departments SET name=? WHERE id=?",
+            "UPDATE departments SET name=%s WHERE id=%s",
             (name, id)
         )
 
@@ -281,7 +281,7 @@ def delete_department(id):
     conn = get_db()
 
     dept = conn.execute(
-        "SELECT college_id FROM departments WHERE id=?",
+        "SELECT college_id FROM departments WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -289,7 +289,7 @@ def delete_department(id):
         conn.close()
         return "العنصر غير موجود"
 
-    conn.execute("DELETE FROM departments WHERE id=?", (id,))
+    conn.execute("DELETE FROM departments WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 

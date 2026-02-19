@@ -91,7 +91,7 @@ def add_college():
 
         conn = get_db()
         conn.execute(
-            "INSERT INTO colleges(name) VALUES(?)",
+            "INSERT INTO colleges(name) VALUES(%s)",
             (name,)
         )
         conn.commit()
@@ -135,7 +135,7 @@ def edit_college(id):
             return "يجب إدخال الاسم"
 
         conn.execute(
-            "UPDATE colleges SET name=? WHERE id=?",
+            "UPDATE colleges SET name=%s WHERE id=%s",
             (name, id)
         )
         conn.commit()
@@ -144,7 +144,7 @@ def edit_college(id):
         return redirect("/")
 
     college = conn.execute(
-        "SELECT * FROM colleges WHERE id=?",
+        "SELECT * FROM colleges WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -181,7 +181,7 @@ def delete_college(id):
 
     conn = get_db()
     conn.execute(
-        "DELETE FROM colleges WHERE id=?",
+        "DELETE FROM colleges WHERE id=%s",
         (id,)
     )
     conn.commit()

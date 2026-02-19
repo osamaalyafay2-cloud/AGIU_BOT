@@ -18,7 +18,7 @@ def login():
 
         conn = get_db()
         user = conn.execute(
-            "SELECT * FROM users WHERE username=?",
+            "SELECT * FROM users WHERE username=%s",
             (username,)
         ).fetchone()
         conn.close()

@@ -20,7 +20,7 @@ def has_department_access(conn, department_id):
     allowed = conn.execute("""
         SELECT 1
         FROM user_permissions
-        WHERE user_id=? AND department_id=?
+        WHERE user_id=%s AND department_id=%s
     """, (session.get("user_id"), department_id)).fetchone()
 
     return allowed is not None
@@ -34,7 +34,7 @@ def has_year_access(conn, year_id):
     allowed = conn.execute("""
         SELECT 1
         FROM user_permissions
-        WHERE user_id=? AND year_id=?
+        WHERE user_id=%s AND year_id=%s
     """, (session.get("user_id"), year_id)).fetchone()
 
     return allowed is not None
@@ -53,7 +53,7 @@ def view_department(id):
     conn = get_db()
 
     department = conn.execute(
-        "SELECT * FROM departments WHERE id=?",
+        "SELECT * FROM departments WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -68,7 +68,7 @@ def view_department(id):
     # جلب الأعوام
     if is_admin():
         years = conn.execute(
-            "SELECT * FROM years WHERE department_id=?",
+            "SELECT * FROM years WHERE department_id=%s",
             (id,)
         ).fetchall()
     else:
@@ -76,7 +76,7 @@ def view_department(id):
             SELECT DISTINCT y.*
             FROM years y
             JOIN user_permissions up ON up.year_id = y.id
-            WHERE y.department_id=? AND up.user_id=?
+            WHERE y.department_id=%s AND up.user_id=%s
         """, (id, session["user_id"])).fetchall()
 
     conn.close()
@@ -133,7 +133,7 @@ def view_year(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -148,7 +148,7 @@ def view_year(id):
     # جلب المستويات
     if is_admin():
         levels = conn.execute(
-            "SELECT * FROM levels WHERE year_id=?",
+            "SELECT * FROM levels WHERE year_id=%s",
             (id,)
         ).fetchall()
     else:
@@ -156,7 +156,7 @@ def view_year(id):
             SELECT l.*
             FROM levels l
             JOIN user_permissions up ON up.level_id = l.id
-            WHERE l.year_id=? AND up.user_id=?
+            WHERE l.year_id=%s AND up.user_id=%s
         """, (id, session["user_id"])).fetchall()
 
     conn.close()
@@ -229,7 +229,7 @@ def add_year(id):
             return "يجب إدخال اسم العام"
 
         conn.execute(
-            "INSERT INTO years(name, department_id) VALUES(?,?)",
+            "INSERT INTO years(name, department_id) VALUES(%s,%s)",
             (name, id)
         )
 
@@ -266,7 +266,7 @@ def edit_year(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -283,7 +283,7 @@ def edit_year(id):
             return "يجب إدخال الاسم"
 
         conn.execute(
-            "UPDATE years SET name=? WHERE id=?",
+            "UPDATE years SET name=%s WHERE id=%s",
             (name, id)
         )
 
@@ -319,7 +319,7 @@ def delete_year(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -327,7 +327,7 @@ def delete_year(id):
         conn.close()
         return "العنصر غير موجود"
 
-    conn.execute("DELETE FROM years WHERE id=?", (id,))
+    conn.execute("DELETE FROM years WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 

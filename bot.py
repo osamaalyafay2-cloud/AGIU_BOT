@@ -85,7 +85,7 @@ def is_logged(update):
 def get_logged_user_by_id(telegram_id):
     conn = get_db()
     user = conn.execute(
-        "SELECT * FROM users WHERE telegram_id=?",
+        "SELECT * FROM users WHERE telegram_id=%s",
         (telegram_id,)
     ).fetchone()
     conn.close()
@@ -142,7 +142,7 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = get_db()
 
     user = conn.execute(
-        "SELECT * FROM users WHERE username=?",
+        "SELECT * FROM users WHERE username=%s",
         (username,)
     ).fetchone()
 
@@ -157,7 +157,7 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     conn.execute(
-        "UPDATE users SET telegram_id=? WHERE id=?",
+        "UPDATE users SET telegram_id=%s WHERE id=%s",
         (update.effective_user.id, user["id"])
     )
     conn.commit()
@@ -221,7 +221,7 @@ async def receive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         FROM subjects s
         JOIN levels l ON s.level_id = l.id
         JOIN user_permissions up ON up.level_id = l.id
-        WHERE s.id=? AND up.user_id=?
+        WHERE s.id=%s AND up.user_id=%s
     """, (subject_id, user["id"])).fetchone()
 
     if not allowed:
@@ -255,7 +255,7 @@ async def receive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.execute("""
         INSERT INTO contents
         (title, description, type, file_path, file_size, mime_type, subject_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (
         file_name,
         "",
@@ -304,7 +304,7 @@ async def receive_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             SELECT l.id
             FROM levels l
             JOIN user_permissions up ON up.level_id = l.id
-            WHERE up.user_id=?
+            WHERE up.user_id=%s
             LIMIT 1
         """, (user["id"],)).fetchone()
 
@@ -315,7 +315,7 @@ async def receive_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         conn.execute("""
             INSERT INTO subjects (name, level_id)
-            VALUES (?, ?)
+            VALUES (%s, %s)
         """, (subject_name, level["id"]))
 
         conn.commit()
@@ -351,7 +351,7 @@ async def render_my_subjects(query, context, conn):
         FROM subjects s
         JOIN levels l ON s.level_id=l.id
         JOIN user_permissions up ON up.level_id=l.id
-        WHERE up.user_id=?
+        WHERE up.user_id=%s
     """, (user["id"],)).fetchall()
 
     if not subjects:
@@ -375,7 +375,7 @@ async def render_subject_files(query, context, conn, subject_id):
     # 1️⃣ التأكد من أن المستخدم مسجل دخول
     telegram_id = query.from_user.id
     conn2 = get_db()
-    user = conn2.execute("SELECT * FROM users WHERE telegram_id=?",(telegram_id,)
+    user = conn2.execute("SELECT * FROM users WHERE telegram_id=%s",(telegram_id,)
     ).fetchone()
     conn2.close()
     if not user:
@@ -388,7 +388,7 @@ async def render_subject_files(query, context, conn, subject_id):
         FROM subjects s
         JOIN levels l ON s.level_id = l.id
         JOIN user_permissions up ON up.level_id = l.id
-        WHERE s.id=? AND up.user_id=?
+        WHERE s.id=%s AND up.user_id=%s
     """, (subject_id, user["id"])).fetchone()
 
     if not allowed:
@@ -397,7 +397,7 @@ async def render_subject_files(query, context, conn, subject_id):
 
     # 3️⃣ جلب ملفات المادة
     contents = conn.execute(
-        "SELECT * FROM contents WHERE subject_id=?",
+        "SELECT * FROM contents WHERE subject_id=%s",
         (subject_id,)
     ).fetchall()
 
@@ -449,7 +449,7 @@ async def render_upload_subjects(query, context, conn):
         FROM subjects s
         JOIN levels l ON s.level_id = l.id
         JOIN user_permissions up ON up.level_id = l.id
-        WHERE up.user_id=?
+        WHERE up.user_id=%s
         ORDER BY s.name
     """, (user["id"],)).fetchall()
 
@@ -535,7 +535,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             FROM subjects s
             JOIN levels l ON s.level_id=l.id
             JOIN user_permissions up ON up.level_id=l.id
-            WHERE up.user_id=?
+            WHERE up.user_id=%s
         """, (user["id"],)).fetchall()
 
         if not subjects:
@@ -594,7 +594,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         content_id = data.split("_")[1]
 
         content = conn.execute(
-            "SELECT * FROM contents WHERE id=?",
+            "SELECT * FROM contents WHERE id=%s",
             (content_id,)
         ).fetchone()
 
@@ -676,7 +676,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         telegram_id = update.effective_user.id
         conn.execute(
-            "UPDATE users SET telegram_id=NULL WHERE telegram_id=?",
+            "UPDATE users SET telegram_id=NULL WHERE telegram_id=%s",
             (telegram_id,)
         )
         conn.commit()
@@ -716,7 +716,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         content_id = data.split("_")[2]
 
-        content = conn.execute("SELECT * FROM contents WHERE id=?",(content_id,)).fetchone()
+        content = conn.execute("SELECT * FROM contents WHERE id=%s",(content_id,)).fetchone()
 
         if not content:
             await query.answer("الملف غير موجود", show_alert=True)
@@ -727,7 +727,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        conn.execute("DELETE FROM contents WHERE id=?", (content_id,))
+        conn.execute("DELETE FROM contents WHERE id=%s", (content_id,))
         conn.commit()
 
         await query.edit_message_text("✅ تم حذف الملف بنجاح.",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ رجوع", callback_data=f"subject_{content['subject_id']}")]]))
@@ -738,14 +738,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         subject_id = data.split("_")[2]
 
-        files = conn.execute("SELECT * FROM contents WHERE subject_id=?",(subject_id,) ).fetchall()
+        files = conn.execute("SELECT * FROM contents WHERE subject_id=%s",(subject_id,) ).fetchall()
 
         for f in files:
             if os.path.exists(f["file_path"]):
                 os.remove(f["file_path"])
 
-        conn.execute("DELETE FROM contents WHERE subject_id=?", (subject_id,))
-        conn.execute("DELETE FROM subjects WHERE id=?", (subject_id,))
+        conn.execute("DELETE FROM contents WHERE subject_id=%s", (subject_id,))
+        conn.execute("DELETE FROM subjects WHERE id=%s", (subject_id,))
         conn.commit()
 
         await query.edit_message_text("✅ تم حذف المادة بالكامل.",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅ الرجوع لموادي", callback_data="my_subjects")]]))

@@ -96,7 +96,7 @@ def add_user():
         conn = get_db()
 
         existing = conn.execute(
-            "SELECT id FROM users WHERE username=?",
+            "SELECT id FROM users WHERE username=%s",
             (username,)
         ).fetchone()
 
@@ -107,7 +107,7 @@ def add_user():
         hashed = generate_password_hash(password)
 
         conn.execute(
-            "INSERT INTO users(username,password,role) VALUES(?,?,?)",
+            "INSERT INTO users(username,password,role) VALUES(%s,%s,%s)",
             (username, hashed, role)
         )
 
@@ -155,8 +155,8 @@ def delete_user(id):
         return "لا يمكنك حذف نفسك"
 
     conn = get_db()
-    conn.execute("DELETE FROM users WHERE id=?", (id,))
-    conn.execute("DELETE FROM user_permissions WHERE user_id=?", (id,))
+    conn.execute("DELETE FROM users WHERE id=%s", (id,))
+    conn.execute("DELETE FROM user_permissions WHERE user_id=%s", (id,))
     conn.commit()
     conn.close()
 
@@ -177,7 +177,7 @@ def edit_user(id):
     conn = get_db()
 
     user = conn.execute(
-        "SELECT * FROM users WHERE id=?",
+        "SELECT * FROM users WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -200,7 +200,7 @@ def edit_user(id):
                 return "لا يمكن إزالة آخر مشرف عام"
 
         conn.execute(
-            "UPDATE users SET role=? WHERE id=?",
+            "UPDATE users SET role=%s WHERE id=%s",
             (role, id)
         )
 
@@ -246,7 +246,7 @@ def manage_permissions(user_id):
     conn = get_db()
 
     user = conn.execute(
-        "SELECT * FROM users WHERE id=?",
+        "SELECT * FROM users WHERE id=%s",
         (user_id,)
     ).fetchone()
 
@@ -266,13 +266,13 @@ def manage_permissions(user_id):
 
         existing = conn.execute("""
             SELECT id FROM user_permissions
-            WHERE user_id=? AND level_id=?
+            WHERE user_id=%s AND level_id=%s
         """, (user_id, level_id)).fetchone()
 
         if not existing:
             conn.execute("""
                 INSERT INTO user_permissions(user_id, department_id, year_id, level_id)
-                VALUES(?,?,?,?)
+                VALUES(%s,%s,%s,%s)
             """, (user_id, department_id, year_id, level_id))
             conn.commit()
 
@@ -289,7 +289,7 @@ def manage_permissions(user_id):
         JOIN departments d ON up.department_id=d.id
         JOIN years y ON up.year_id=y.id
         JOIN levels l ON up.level_id=l.id
-        WHERE up.user_id=?
+        WHERE up.user_id=%s
     """, (user_id,)).fetchall()
 
     conn.close()
@@ -346,7 +346,7 @@ def delete_permission(id):
         return check
 
     conn = get_db()
-    conn.execute("DELETE FROM user_permissions WHERE id=?", (id,))
+    conn.execute("DELETE FROM user_permissions WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 

@@ -17,7 +17,7 @@ def has_level_access(conn, level_id):
 
     allowed = conn.execute("""
         SELECT 1 FROM user_permissions
-        WHERE user_id=? AND level_id=?
+        WHERE user_id=%s AND level_id=%s
     """, (session.get("user_id"), level_id)).fetchone()
 
     return allowed is not None
@@ -35,7 +35,7 @@ def view_subject(id):
     conn = get_db()
 
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -49,7 +49,7 @@ def view_subject(id):
         return "غير مصرح لك"
 
     contents = conn.execute(
-        "SELECT * FROM contents WHERE subject_id=?",
+        "SELECT * FROM contents WHERE subject_id=%s",
         (id,)
     ).fetchall()
 
@@ -98,7 +98,7 @@ def add_content(id):
     conn = get_db()
 
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -141,7 +141,7 @@ def add_content(id):
         conn.execute("""
             INSERT INTO contents
             (title, description, type, file_path, file_size, mime_type, subject_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         (title, description, type_, filepath, file_size, mime_type, id)
         )
@@ -188,7 +188,7 @@ def edit_content(id):
     conn = get_db()
 
     content = conn.execute(
-        "SELECT * FROM contents WHERE id=?",
+        "SELECT * FROM contents WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -197,7 +197,7 @@ def edit_content(id):
         return "العنصر غير موجود"
 
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (content["subject_id"],)
     ).fetchone()
 
@@ -209,8 +209,8 @@ def edit_content(id):
 
         conn.execute("""
             UPDATE contents
-            SET title=?, description=?, type=?
-            WHERE id=?
+            SET title=%s, description=%s, type=%s
+            WHERE id=%s
         """,
         (
             request.form["title"],
@@ -257,7 +257,7 @@ def delete_content(id):
     conn = get_db()
 
     content = conn.execute(
-        "SELECT * FROM contents WHERE id=?",
+        "SELECT * FROM contents WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -266,7 +266,7 @@ def delete_content(id):
         return "العنصر غير موجود"
 
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (content["subject_id"],)
     ).fetchone()
 
@@ -278,7 +278,7 @@ def delete_content(id):
         os.remove(content["file_path"])
 
     conn.execute(
-        "DELETE FROM contents WHERE id=?",
+        "DELETE FROM contents WHERE id=%s",
         (id,)
     )
 

@@ -141,7 +141,7 @@ def add_college():
 
     if request.method=="POST":
         conn=get_db()
-        conn.execute("INSERT INTO colleges(name) VALUES(?)",
+        conn.execute("INSERT INTO colleges(name) VALUES(%s)",
                      (request.form["name"],))
         conn.commit()
         conn.close()
@@ -164,13 +164,13 @@ def edit_college(id):
     conn=get_db()
 
     if request.method=="POST":
-        conn.execute("UPDATE colleges SET name=? WHERE id=?",
+        conn.execute("UPDATE colleges SET name=%s WHERE id=%s",
                      (request.form["name"],id))
         conn.commit()
         conn.close()
         return redirect("/")
 
-    college=conn.execute("SELECT * FROM colleges WHERE id=?",(id,)).fetchone()
+    college=conn.execute("SELECT * FROM colleges WHERE id=%s",(id,)).fetchone()
     if not college:
        return "العنصر غير موجود"
     conn.close()
@@ -189,7 +189,7 @@ def edit_college(id):
 @app.route("/delete_college/<int:id>", methods=["POST"])
 def delete_college(id):
     conn=get_db()
-    conn.execute("DELETE FROM colleges WHERE id=?",(id,))
+    conn.execute("DELETE FROM colleges WHERE id=%s",(id,))
     conn.commit()
     conn.close()
     return redirect("/")
@@ -205,7 +205,7 @@ def view_college(id):
     conn = get_db()
 
     college = conn.execute(
-        "SELECT * FROM colleges WHERE id=?",
+        "SELECT * FROM colleges WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -215,7 +215,7 @@ def view_college(id):
         return "العنصر غير موجود"
 
     departments = conn.execute(
-        "SELECT * FROM departments WHERE college_id=?",
+        "SELECT * FROM departments WHERE college_id=%s",
         (id,)
     ).fetchall()
 
@@ -253,7 +253,7 @@ def add_department(id):
 
     if request.method=="POST":
         conn=get_db()
-        conn.execute("INSERT INTO departments(name,college_id) VALUES(?,?)",
+        conn.execute("INSERT INTO departments(name,college_id) VALUES(%s,%s)",
                      (request.form["name"],id))
         conn.commit()
         conn.close()
@@ -276,15 +276,15 @@ def edit_department(id):
     conn=get_db()
 
     if request.method=="POST":
-        conn.execute("UPDATE departments SET name=? WHERE id=?",
+        conn.execute("UPDATE departments SET name=%s WHERE id=%s",
                      (request.form["name"],id))
         conn.commit()
-        college_id=conn.execute("SELECT college_id FROM departments WHERE id=?",
+        college_id=conn.execute("SELECT college_id FROM departments WHERE id=%s",
                                 (id,)).fetchone()["college_id"]
         conn.close()
         return redirect(f"/college/{college_id}")
 
-    dept=conn.execute("SELECT * FROM departments WHERE id=?",(id,)).fetchone()
+    dept=conn.execute("SELECT * FROM departments WHERE id=%s",(id,)).fetchone()
     if not dept:
         return "العنصر غير موجود"
     conn.close()
@@ -303,13 +303,13 @@ def edit_department(id):
 def delete_department(id):
 
     conn=get_db()
-    row = conn.execute("SELECT college_id FROM departments WHERE id=?",(id,)).fetchone()
+    row = conn.execute("SELECT college_id FROM departments WHERE id=%s",(id,)).fetchone()
     if not row:
         conn.close()
         return "العنصر غير موجود"
 
     college_id = row["college_id"]
-    conn.execute("DELETE FROM departments WHERE id=?",(id,))
+    conn.execute("DELETE FROM departments WHERE id=%s",(id,))
     conn.commit()
     conn.close()
     return redirect(f"/college/{college_id}")
@@ -325,7 +325,7 @@ def view_department(id):
     conn = get_db()
 
     dept = conn.execute(
-        "SELECT * FROM departments WHERE id=?",
+        "SELECT * FROM departments WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -334,7 +334,7 @@ def view_department(id):
         return "العنصر غير موجود"
 
     years = conn.execute(
-        "SELECT * FROM years WHERE department_id=?",
+        "SELECT * FROM years WHERE department_id=%s",
         (id,)
     ).fetchall()
 
@@ -373,7 +373,7 @@ def add_year(id):
     conn = get_db()
 
     dept = conn.execute(
-        "SELECT * FROM departments WHERE id=?",
+        "SELECT * FROM departments WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -383,7 +383,7 @@ def add_year(id):
 
     if request.method == "POST":
         conn.execute(
-            "INSERT INTO years(name, department_id) VALUES(?,?)",
+            "INSERT INTO years(name, department_id) VALUES(%s,%s)",
             (request.form["name"], id)
         )
         conn.commit()
@@ -409,13 +409,13 @@ def edit_year(id):
 
     if request.method == "POST":
         conn.execute(
-            "UPDATE years SET name=? WHERE id=?",
+            "UPDATE years SET name=%s WHERE id=%s",
             (request.form["name"], id)
         )
         conn.commit()
 
         row = conn.execute(
-            "SELECT department_id FROM years WHERE id=?",
+            "SELECT department_id FROM years WHERE id=%s",
             (id,)
         ).fetchone()
 
@@ -428,7 +428,7 @@ def edit_year(id):
         return redirect(f"/department/{department_id}")
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -454,7 +454,7 @@ def delete_year(id):
     conn = get_db()
 
     row = conn.execute(
-        "SELECT department_id FROM years WHERE id=?",
+        "SELECT department_id FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -465,7 +465,7 @@ def delete_year(id):
     department_id = row["department_id"]
 
     conn.execute(
-        "DELETE FROM years WHERE id=?",
+        "DELETE FROM years WHERE id=%s",
         (id,)
     )
 
@@ -480,7 +480,7 @@ def add_level(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -490,7 +490,7 @@ def add_level(id):
 
     if request.method=="POST":
         conn.execute(
-            "INSERT INTO levels(name,year_id) VALUES(?,?)",
+            "INSERT INTO levels(name,year_id) VALUES(%s,%s)",
             (request.form["name"],id)
         )
         conn.commit()
@@ -515,12 +515,12 @@ def edit_level(id):
     conn=get_db()
 
     if request.method=="POST":
-        conn.execute("UPDATE levels SET name=? WHERE id=?",
+        conn.execute("UPDATE levels SET name=%s WHERE id=%s",
                      (request.form["name"],id))
         conn.commit()
 
         row = conn.execute(
-            "SELECT year_id FROM levels WHERE id=?",
+            "SELECT year_id FROM levels WHERE id=%s",
             (id,)
         ).fetchone()
 
@@ -532,7 +532,7 @@ def edit_level(id):
         conn.close()
         return redirect(f"/year/{year_id}")
 
-    level=conn.execute("SELECT * FROM levels WHERE id=?",(id,)).fetchone()
+    level=conn.execute("SELECT * FROM levels WHERE id=%s",(id,)).fetchone()
     if not level:
         conn.close()
         return "العنصر غير موجود"
@@ -553,7 +553,7 @@ def delete_level(id):
     conn=get_db()
 
     row = conn.execute(
-        "SELECT year_id FROM levels WHERE id=?",
+        "SELECT year_id FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -563,7 +563,7 @@ def delete_level(id):
 
     year_id = row["year_id"]
 
-    conn.execute("DELETE FROM levels WHERE id=?",(id,))
+    conn.execute("DELETE FROM levels WHERE id=%s",(id,))
     conn.commit()
     conn.close()
 
@@ -578,7 +578,7 @@ def view_year(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -587,7 +587,7 @@ def view_year(id):
         return "العنصر غير موجود"
 
     levels = conn.execute(
-        "SELECT * FROM levels WHERE year_id=?",
+        "SELECT * FROM levels WHERE year_id=%s",
         (id,)
     ).fetchall()
 
@@ -625,7 +625,7 @@ def view_level(id):
     conn = get_db()
 
     level = conn.execute(
-        "SELECT * FROM levels WHERE id=?",
+        "SELECT * FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -634,7 +634,7 @@ def view_level(id):
         return "العنصر غير موجود"
 
     subjects = conn.execute(
-        "SELECT * FROM subjects WHERE level_id=?",
+        "SELECT * FROM subjects WHERE level_id=%s",
         (id,)
     ).fetchall()
 
@@ -672,7 +672,7 @@ def add_subject(id):
 
     if request.method=="POST":
         conn=get_db()
-        conn.execute("INSERT INTO subjects(name,level_id) VALUES(?,?)",
+        conn.execute("INSERT INTO subjects(name,level_id) VALUES(%s,%s)",
                      (request.form["name"],id))
         conn.commit()
         conn.close()
@@ -695,10 +695,10 @@ def edit_subject(id):
     conn=get_db()
 
     if request.method == "POST":
-        conn.execute("UPDATE subjects SET name=? WHERE id=?",(request.form["name"], id))
+        conn.execute("UPDATE subjects SET name=%s WHERE id=%s",(request.form["name"], id))
         conn.commit()
 
-        row = conn.execute("SELECT level_id FROM subjects WHERE id=?",(id,)
+        row = conn.execute("SELECT level_id FROM subjects WHERE id=%s",(id,)
         ).fetchone()
 
         if not row:
@@ -709,7 +709,7 @@ def edit_subject(id):
         conn.close()
         return redirect(f"/level/{level_id}")
 
-    subject=conn.execute("SELECT * FROM subjects WHERE id=?",(id,)).fetchone()
+    subject=conn.execute("SELECT * FROM subjects WHERE id=%s",(id,)).fetchone()
     if not subject:
         return "العنصر غير موجود"
     conn.close()
@@ -728,7 +728,7 @@ def edit_subject(id):
 def delete_subject(id):
 
     conn=get_db()
-    row = conn.execute("SELECT level_id FROM subjects WHERE id=?",(id,)
+    row = conn.execute("SELECT level_id FROM subjects WHERE id=%s",(id,)
     ).fetchone()
 
     if not row:
@@ -736,7 +736,7 @@ def delete_subject(id):
         return "العنصر غير موجود"
 
     level_id = row["level_id"]
-    conn.execute("DELETE FROM subjects WHERE id=?",(id,))
+    conn.execute("DELETE FROM subjects WHERE id=%s",(id,))
     conn.commit()
     conn.close()
     return redirect(f"/level/{level_id}")
@@ -751,7 +751,7 @@ def view_subject(id):
 
     conn = get_db()
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -760,7 +760,7 @@ def view_subject(id):
         return "العنصر غير موجود"
 
     contents = conn.execute(
-        "SELECT * FROM contents WHERE subject_id=?",
+        "SELECT * FROM contents WHERE subject_id=%s",
         (id,)
     ).fetchall()
 
@@ -800,7 +800,7 @@ def add_content(id):
 
     # التأكد أن المادة موجودة
     subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=?",
+        "SELECT * FROM subjects WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -850,7 +850,7 @@ def add_content(id):
         conn.execute("""
             INSERT INTO contents
             (title, description, type, file_path, file_size, mime_type, subject_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         (title, description, type_, filepath, file_size, mime_type, id)
         )
@@ -893,8 +893,8 @@ def edit_content(id):
     if request.method=="POST":
         conn.execute("""
                         UPDATE contents 
-                        SET title=?, description=?, type=? 
-                        WHERE id=?
+                        SET title=%s, description=%s, type=%s 
+                        WHERE id=%s
                         """,
                         (request.form["title"],
                         request.form.get("description",""),
@@ -902,12 +902,12 @@ def edit_content(id):
                          id)
                     )
         conn.commit()
-        subject_id=conn.execute("SELECT subject_id FROM contents WHERE id=?",
+        subject_id=conn.execute("SELECT subject_id FROM contents WHERE id=%s",
                                 (id,)).fetchone()["subject_id"]
         conn.close()
         return redirect(f"/subject/{subject_id}")
 
-    content=conn.execute("SELECT * FROM contents WHERE id=?",(id,)).fetchone()
+    content=conn.execute("SELECT * FROM contents WHERE id=%s",(id,)).fetchone()
     if not content:
         return "العنصر غير موجود"
     conn.close()
@@ -937,7 +937,7 @@ def delete_content(id):
     conn = get_db()
 
     content = conn.execute(
-        "SELECT * FROM contents WHERE id=?",
+        "SELECT * FROM contents WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -954,7 +954,7 @@ def delete_content(id):
 
     # حذف السجل من قاعدة البيانات
     conn.execute(
-        "DELETE FROM contents WHERE id=?",
+        "DELETE FROM contents WHERE id=%s",
         (id,)
     )
 
@@ -973,7 +973,7 @@ def serve_file(filename):
     conn = get_db()
 
     row = conn.execute(
-        "SELECT * FROM contents WHERE file_path LIKE ?",
+        "SELECT * FROM contents WHERE file_path LIKE %s",
         (f"%{filename}",)
     ).fetchone()
 

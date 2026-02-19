@@ -133,7 +133,7 @@ async def student_handler(query, context, get_db):
         college_id = data.split("_")[2]
 
         departments = conn.execute(
-            "SELECT * FROM departments WHERE college_id=?",
+            "SELECT * FROM departments WHERE college_id=%s",
             (college_id,)
         ).fetchall()
 
@@ -158,7 +158,7 @@ async def student_handler(query, context, get_db):
         department_id = data.split("_")[2]
 
         years = conn.execute(
-            "SELECT * FROM years WHERE department_id=?",
+            "SELECT * FROM years WHERE department_id=%s",
             (department_id,)
         ).fetchall()
 
@@ -183,7 +183,7 @@ async def student_handler(query, context, get_db):
         year_id = data.split("_")[2]
 
         levels = conn.execute(
-            "SELECT * FROM levels WHERE year_id=?",
+            "SELECT * FROM levels WHERE year_id=%s",
             (year_id,)
         ).fetchall()
 
@@ -208,7 +208,7 @@ async def student_handler(query, context, get_db):
         level_id = data.split("_")[2]
 
         subjects = conn.execute(
-            "SELECT * FROM subjects WHERE level_id=?",
+            "SELECT * FROM subjects WHERE level_id=%s",
             (level_id,)
         ).fetchall()
 
@@ -233,7 +233,7 @@ async def student_handler(query, context, get_db):
         subject_id = data.split("_")[2]
 
         contents = conn.execute(
-            "SELECT * FROM contents WHERE subject_id=?",
+            "SELECT * FROM contents WHERE subject_id=%s",
             (subject_id,)
         ).fetchall()
 
@@ -262,7 +262,7 @@ async def student_handler(query, context, get_db):
         content_id = data.split("_")[2]
 
         content = conn.execute(
-            "SELECT * FROM contents WHERE id=?",
+            "SELECT * FROM contents WHERE id=%s",
             (content_id,)
         ).fetchone()
 

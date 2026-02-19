@@ -15,7 +15,7 @@ def has_year_access(conn, year_id):
     allowed = conn.execute("""
         SELECT 1
         FROM user_permissions
-        WHERE user_id=? AND year_id=?
+        WHERE user_id=%s AND year_id=%s
     """, (session.get("user_id"), year_id)).fetchone()
 
     return allowed is not None
@@ -33,7 +33,7 @@ def view_year(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -49,7 +49,7 @@ def view_year(id):
     # 👑 المشرف يرى كل المستويات
     if session["role"] == "super_admin":
         levels = conn.execute(
-            "SELECT * FROM levels WHERE year_id=?",
+            "SELECT * FROM levels WHERE year_id=%s",
             (id,)
         ).fetchall()
     else:
@@ -58,7 +58,7 @@ def view_year(id):
             SELECT l.*
             FROM levels l
             JOIN user_permissions up ON up.level_id = l.id
-            WHERE l.year_id=? AND up.user_id=?
+            WHERE l.year_id=%s AND up.user_id=%s
         """, (id, session["user_id"])).fetchall()
 
     conn.close()
@@ -114,7 +114,7 @@ def add_level(id):
     conn = get_db()
 
     year = conn.execute(
-        "SELECT * FROM years WHERE id=?",
+        "SELECT * FROM years WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -124,7 +124,7 @@ def add_level(id):
 
     if request.method == "POST":
         conn.execute(
-            "INSERT INTO levels(name, year_id) VALUES(?,?)",
+            "INSERT INTO levels(name, year_id) VALUES(%s,%s)",
             (request.form["name"], id)
         )
         conn.commit()
@@ -158,7 +158,7 @@ def edit_level(id):
     conn = get_db()
 
     level = conn.execute(
-        "SELECT * FROM levels WHERE id=?",
+        "SELECT * FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -168,7 +168,7 @@ def edit_level(id):
 
     if request.method == "POST":
         conn.execute(
-            "UPDATE levels SET name=? WHERE id=?",
+            "UPDATE levels SET name=%s WHERE id=%s",
             (request.form["name"], id)
         )
         conn.commit()
@@ -201,7 +201,7 @@ def delete_level(id):
     conn = get_db()
 
     level = conn.execute(
-        "SELECT * FROM levels WHERE id=?",
+        "SELECT * FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -209,7 +209,7 @@ def delete_level(id):
         conn.close()
         return "العنصر غير موجود"
 
-    conn.execute("DELETE FROM levels WHERE id=?", (id,))
+    conn.execute("DELETE FROM levels WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 
@@ -228,7 +228,7 @@ def view_level(id):
     conn = get_db()
 
     level = conn.execute(
-        "SELECT * FROM levels WHERE id=?",
+        "SELECT * FROM levels WHERE id=%s",
         (id,)
     ).fetchone()
 
@@ -241,7 +241,7 @@ def view_level(id):
         allowed = conn.execute("""
             SELECT 1
             FROM user_permissions
-            WHERE user_id=? AND level_id=?
+            WHERE user_id=%s AND level_id=%s
         """, (session["user_id"], id)).fetchone()
 
         if not allowed:
@@ -249,7 +249,7 @@ def view_level(id):
             return "غير مصرح لك"
 
     subjects = conn.execute(
-        "SELECT * FROM subjects WHERE level_id=?",
+        "SELECT * FROM subjects WHERE level_id=%s",
         (id,)
     ).fetchall()
 
