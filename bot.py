@@ -786,5 +786,6 @@ def start_bot():
     print("Bot starting...")
     app.run_polling()
 
-    if __name__ == "__main__":
-        start_bot()
+
+if __name__ == "__main__":
+    start_bot()
