@@ -1,4 +1,4 @@
-import sqlite3
+from database import get_db
 import os
 import time
 from functools import wraps
@@ -28,9 +28,8 @@ from student import student_start, register_student_handlers,student_handler
 
 TOKEN = os.environ.get("TOKEN")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE = os.path.join(BASE_DIR, "university.db")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -45,11 +44,6 @@ RATE_LIMIT_SECONDS = 1.2
 # الاتصال بقاعدة البيانات
 # ======================================================
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
 
 
 # ======================================================
@@ -784,5 +778,6 @@ app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VI
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_text))
 app.add_handler(CommandHandler("student", lambda u, c: student_start(u, c, get_db)))
 register_student_handlers(app, get_db)
-if __name__ == "__main__":
+def start_bot():
+    print("Bot started...")
     app.run_polling()
