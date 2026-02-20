@@ -1,22 +1,29 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
+from psycopg2.extras import RealDictCursor
 
 levels_bp = Blueprint("levels", __name__)
 
 # ======================================================
 # دالة فحص صلاحية العام
 # ======================================================
+
 def has_year_access(conn, year_id):
 
     if session.get("role") == "super_admin":
         return True
 
-    allowed = conn.execute("""
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute("""
         SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND year_id=%s
-    """, (session.get("user_id"), year_id)).fetchone()
+    """, (session.get("user_id"), year_id))
+
+    allowed = cursor.fetchone()
+    cursor.close()
 
     return allowed is not None
 
@@ -24,6 +31,7 @@ def has_year_access(conn, year_id):
 # ======================================================
 # عرض مستويات عام
 # ======================================================
+
 @levels_bp.route("/year/<int:id>")
 def view_year(id):
 
@@ -31,43 +39,40 @@ def view_year(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    year = conn.execute(
-        "SELECT * FROM years WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM years WHERE id=%s", (id,))
+    year = cursor.fetchone()
 
     if not year:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔒 منع الدخول لعام خارج النطاق
     if not has_year_access(conn, id):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
-    # 👑 المشرف يرى كل المستويات
     if session["role"] == "super_admin":
-        levels = conn.execute(
-            "SELECT * FROM levels WHERE year_id=%s",
-            (id,)
-        ).fetchall()
+        cursor.execute("SELECT * FROM levels WHERE year_id=%s", (id,))
     else:
-        # 👤 المستخدم يرى فقط مستوياته
-        levels = conn.execute("""
+        cursor.execute("""
             SELECT l.*
             FROM levels l
             JOIN user_permissions up ON up.level_id = l.id
             WHERE l.year_id=%s AND up.user_id=%s
-        """, (id, session["user_id"])).fetchall()
+        """, (id, session["user_id"]))
 
+    levels = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     body = f"""
     <a class="btn open" href="/department/{year['department_id']}">⬅ رجوع</a>
     """
 
-    # إضافة مستوى فقط للمشرف
     if session["role"] == "super_admin":
         body += f"""
         <a class="btn add" href="/add_level/{id}">➕ إضافة مستوى</a>
@@ -100,8 +105,9 @@ def view_year(id):
 
 
 # ======================================================
-# إضافة مستوى (فقط super_admin)
+# إضافة مستوى
 # ======================================================
+
 @levels_bp.route("/add_level/<int:id>", methods=["GET", "POST"])
 def add_level(id):
 
@@ -112,25 +118,27 @@ def add_level(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    year = conn.execute(
-        "SELECT * FROM years WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM years WHERE id=%s", (id,))
+    year = cursor.fetchone()
 
     if not year:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
     if request.method == "POST":
-        conn.execute(
+        cursor.execute(
             "INSERT INTO levels(name, year_id) VALUES(%s,%s)",
             (request.form["name"], id)
         )
         conn.commit()
+        cursor.close()
         conn.close()
         return redirect(f"/year/{id}")
 
+    cursor.close()
     conn.close()
 
     return render("إضافة مستوى", f"""
@@ -144,8 +152,9 @@ def add_level(id):
 
 
 # ======================================================
-# تعديل مستوى (فقط super_admin)
+# تعديل مستوى
 # ======================================================
+
 @levels_bp.route("/edit_level/<int:id>", methods=["GET", "POST"])
 def edit_level(id):
 
@@ -156,25 +165,27 @@ def edit_level(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    level = conn.execute(
-        "SELECT * FROM levels WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
+    level = cursor.fetchone()
 
     if not level:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
     if request.method == "POST":
-        conn.execute(
+        cursor.execute(
             "UPDATE levels SET name=%s WHERE id=%s",
             (request.form["name"], id)
         )
         conn.commit()
+        cursor.close()
         conn.close()
         return redirect(f"/year/{level['year_id']}")
 
+    cursor.close()
     conn.close()
 
     return render("تعديل مستوى", f"""
@@ -187,8 +198,9 @@ def edit_level(id):
 
 
 # ======================================================
-# حذف مستوى (فقط super_admin)
+# حذف مستوى
 # ======================================================
+
 @levels_bp.route("/delete_level/<int:id>", methods=["POST"])
 def delete_level(id):
 
@@ -199,18 +211,20 @@ def delete_level(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    level = conn.execute(
-        "SELECT * FROM levels WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
+    level = cursor.fetchone()
 
     if not level:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    conn.execute("DELETE FROM levels WHERE id=%s", (id,))
+    cursor.execute("DELETE FROM levels WHERE id=%s", (id,))
     conn.commit()
+
+    cursor.close()
     conn.close()
 
     return redirect(f"/year/{level['year_id']}")
@@ -219,6 +233,7 @@ def delete_level(id):
 # ======================================================
 # عرض مواد مستوى
 # ======================================================
+
 @levels_bp.route("/level/<int:id>")
 def view_level(id):
 
@@ -226,33 +241,34 @@ def view_level(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    level = conn.execute(
-        "SELECT * FROM levels WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
+    level = cursor.fetchone()
 
     if not level:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔒 منع الدخول لمستوى خارج النطاق
     if session["role"] != "super_admin":
-        allowed = conn.execute("""
+        cursor.execute("""
             SELECT 1
             FROM user_permissions
             WHERE user_id=%s AND level_id=%s
-        """, (session["user_id"], id)).fetchone()
+        """, (session["user_id"], id))
+
+        allowed = cursor.fetchone()
 
         if not allowed:
+            cursor.close()
             conn.close()
             return "غير مصرح لك"
 
-    subjects = conn.execute(
-        "SELECT * FROM subjects WHERE level_id=%s",
-        (id,)
-    ).fetchall()
+    cursor.execute("SELECT * FROM subjects WHERE level_id=%s", (id,))
+    subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     body = f"""

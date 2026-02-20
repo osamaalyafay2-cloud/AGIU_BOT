@@ -1,6 +1,7 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
+from psycopg2.extras import RealDictCursor
 
 colleges_bp = Blueprint("colleges", __name__)
 
@@ -11,19 +12,22 @@ colleges_bp = Blueprint("colleges", __name__)
 @colleges_bp.route("/")
 def home():
 
-    # حماية الصفحة
     if "user_id" not in session:
         return redirect("/login")
 
     conn = get_db()
-    colleges = conn.execute("SELECT * FROM colleges").fetchall()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute("SELECT * FROM colleges")
+    colleges = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     body = """
     <div style="margin-bottom:15px;">
     """
 
-    # زر إدارة المستخدمين يظهر فقط للمشرف
     if session.get("role") == "super_admin":
         body += """
         <a class="btn add" href="/admin/users">👥 إدارة المستخدمين</a>
@@ -35,7 +39,6 @@ def home():
     <hr>
     """
 
-    # فقط المشرف العام يستطيع الإضافة
     if session.get("role") == "super_admin":
         body += """
         <a class="btn add" href="/add_college">➕ إضافة كلية</a>
@@ -52,7 +55,6 @@ def home():
         <a class="btn open" href="/college/{c['id']}">فتح</a>
         """
 
-        # صلاحيات المشرف فقط
         if session.get("role") == "super_admin":
             body += f"""
             <a class="btn edit" href="/edit_college/{c['id']}">تعديل</a>
@@ -90,11 +92,15 @@ def add_college():
             return "يجب إدخال اسم الكلية"
 
         conn = get_db()
-        conn.execute(
+        cursor = conn.cursor()
+
+        cursor.execute(
             "INSERT INTO colleges(name) VALUES(%s)",
             (name,)
         )
+
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect("/")
@@ -125,33 +131,41 @@ def edit_college(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     if request.method == "POST":
 
         name = request.form.get("name", "").strip()
 
         if not name:
+            cursor.close()
             conn.close()
             return "يجب إدخال الاسم"
 
-        conn.execute(
+        cursor.execute(
             "UPDATE colleges SET name=%s WHERE id=%s",
             (name, id)
         )
+
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect("/")
 
-    college = conn.execute(
+    cursor.execute(
         "SELECT * FROM colleges WHERE id=%s",
         (id,)
-    ).fetchone()
+    )
+
+    college = cursor.fetchone()
 
     if not college:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
+    cursor.close()
     conn.close()
 
     body = f"""
@@ -180,11 +194,15 @@ def delete_college(id):
         return "غير مصرح لك"
 
     conn = get_db()
-    conn.execute(
+    cursor = conn.cursor()
+
+    cursor.execute(
         "DELETE FROM colleges WHERE id=%s",
         (id,)
     )
+
     conn.commit()
+    cursor.close()
     conn.close()
 
     return redirect("/")

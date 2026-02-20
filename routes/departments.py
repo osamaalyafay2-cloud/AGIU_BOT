@@ -1,6 +1,7 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
+from psycopg2.extras import RealDictCursor
 
 departments_bp = Blueprint("departments", __name__)
 
@@ -17,11 +18,16 @@ def has_department_access(conn, department_id):
     if is_admin():
         return True
 
-    allowed = conn.execute("""
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute("""
         SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND department_id=%s
-    """, (session.get("user_id"), department_id)).fetchone()
+    """, (session.get("user_id"), department_id))
+
+    allowed = cursor.fetchone()
+    cursor.close()
 
     return allowed is not None
 
@@ -37,30 +43,32 @@ def view_college(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    college = conn.execute(
-        "SELECT * FROM colleges WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM colleges WHERE id=%s", (id,))
+    college = cursor.fetchone()
 
     if not college:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # جلب الأقسام
     if is_admin():
-        departments = conn.execute(
+        cursor.execute(
             "SELECT * FROM departments WHERE college_id=%s",
             (id,)
-        ).fetchall()
+        )
     else:
-        departments = conn.execute("""
+        cursor.execute("""
             SELECT DISTINCT d.*
             FROM departments d
             JOIN user_permissions up ON up.department_id=d.id
             WHERE d.college_id=%s AND up.user_id=%s
-        """, (id, session["user_id"])).fetchall()
+        """, (id, session["user_id"]))
 
+    departments = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     body = f"""
@@ -110,25 +118,25 @@ def view_department(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    department = conn.execute(
-        "SELECT * FROM departments WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM departments WHERE id=%s", (id,))
+    department = cursor.fetchone()
 
     if not department:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
     if not has_department_access(conn, id):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
-    years = conn.execute(
-        "SELECT * FROM years WHERE department_id=%s",
-        (id,)
-    ).fetchall()
+    cursor.execute("SELECT * FROM years WHERE department_id=%s", (id,))
+    years = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     body = f"""
@@ -181,25 +189,29 @@ def add_department(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor()
 
     if request.method == "POST":
 
         name = request.form.get("name", "").strip()
 
         if not name:
+            cursor.close()
             conn.close()
             return "يجب إدخال اسم القسم"
 
-        conn.execute(
+        cursor.execute(
             "INSERT INTO departments(name,college_id) VALUES(%s,%s)",
             (name, id)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(f"/college/{id}")
 
+    cursor.close()
     conn.close()
 
     return render("إضافة قسم", f"""
@@ -226,13 +238,13 @@ def edit_department(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    dept = conn.execute(
-        "SELECT * FROM departments WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM departments WHERE id=%s", (id,))
+    dept = cursor.fetchone()
 
     if not dept:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
@@ -241,19 +253,22 @@ def edit_department(id):
         name = request.form.get("name", "").strip()
 
         if not name:
+            cursor.close()
             conn.close()
             return "يجب إدخال الاسم"
 
-        conn.execute(
+        cursor.execute(
             "UPDATE departments SET name=%s WHERE id=%s",
             (name, id)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(f"/college/{dept['college_id']}")
 
+    cursor.close()
     conn.close()
 
     return render("تعديل قسم", f"""
@@ -279,18 +294,20 @@ def delete_department(id):
         return "غير مصرح لك"
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    dept = conn.execute(
-        "SELECT college_id FROM departments WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT college_id FROM departments WHERE id=%s", (id,))
+    dept = cursor.fetchone()
 
     if not dept:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    conn.execute("DELETE FROM departments WHERE id=%s", (id,))
+    cursor.execute("DELETE FROM departments WHERE id=%s", (id,))
+
     conn.commit()
+    cursor.close()
     conn.close()
 
     return redirect(f"/college/{dept['college_id']}")

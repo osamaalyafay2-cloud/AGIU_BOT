@@ -1,22 +1,28 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
+from psycopg2.extras import RealDictCursor
 
 subjects_bp = Blueprint("subjects", __name__)
 
 # ======================================================
 # دالة مساعدة لفحص صلاحية المستوى
 # ======================================================
+
 def has_level_access(conn, level_id):
 
-    # المشرف العام لديه صلاحية كاملة
     if session.get("role") == "super_admin":
         return True
 
-    allowed = conn.execute("""
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute("""
         SELECT 1 FROM user_permissions
         WHERE user_id=%s AND level_id=%s
-    """, (session.get("user_id"), level_id)).fetchone()
+    """, (session.get("user_id"), level_id))
+
+    allowed = cursor.fetchone()
+    cursor.close()
 
     return allowed is not None
 
@@ -24,6 +30,7 @@ def has_level_access(conn, level_id):
 # ======================================================
 # عرض مواد مستوى
 # ======================================================
+
 @subjects_bp.route("/level/<int:id>")
 def view_level(id):
 
@@ -31,26 +38,25 @@ def view_level(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    level = conn.execute(
-        "SELECT * FROM levels WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
+    level = cursor.fetchone()
 
     if not level:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔒 منع الدخول المباشر لمستوى خارج الصلاحية
     if not has_level_access(conn, id):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
-    subjects = conn.execute(
-        "SELECT * FROM subjects WHERE level_id=%s",
-        (id,)
-    ).fetchall()
+    cursor.execute("SELECT * FROM subjects WHERE level_id=%s", (id,))
+    subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     body = f"""
@@ -81,6 +87,7 @@ def view_level(id):
 # ======================================================
 # إضافة مادة
 # ======================================================
+
 @subjects_bp.route("/add_subject/<int:id>", methods=["GET", "POST"])
 def add_subject(id):
 
@@ -88,18 +95,18 @@ def add_subject(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    level = conn.execute(
-        "SELECT * FROM levels WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
+    level = cursor.fetchone()
 
     if not level:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔐 فحص الصلاحية
     if not has_level_access(conn, id):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
@@ -108,19 +115,22 @@ def add_subject(id):
         name = request.form.get("name", "").strip()
 
         if not name:
+            cursor.close()
             conn.close()
             return "يجب إدخال اسم المادة"
 
-        conn.execute(
+        cursor.execute(
             "INSERT INTO subjects(name, level_id) VALUES(%s,%s)",
             (name, id)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(f"/level/{id}")
 
+    cursor.close()
     conn.close()
 
     return render("إضافة مادة", f"""
@@ -136,6 +146,7 @@ def add_subject(id):
 # ======================================================
 # تعديل مادة
 # ======================================================
+
 @subjects_bp.route("/edit_subject/<int:id>", methods=["GET", "POST"])
 def edit_subject(id):
 
@@ -143,18 +154,18 @@ def edit_subject(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM subjects WHERE id=%s", (id,))
+    subject = cursor.fetchone()
 
     if not subject:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔐 فحص الصلاحية بناءً على مستوى المادة
     if not has_level_access(conn, subject["level_id"]):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
@@ -163,19 +174,22 @@ def edit_subject(id):
         name = request.form.get("name", "").strip()
 
         if not name:
+            cursor.close()
             conn.close()
             return "يجب إدخال اسم المادة"
 
-        conn.execute(
+        cursor.execute(
             "UPDATE subjects SET name=%s WHERE id=%s",
             (name, id)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(f"/level/{subject['level_id']}")
 
+    cursor.close()
     conn.close()
 
     return render("تعديل مادة", f"""
@@ -190,6 +204,7 @@ def edit_subject(id):
 # ======================================================
 # حذف مادة
 # ======================================================
+
 @subjects_bp.route("/delete_subject/<int:id>", methods=["POST"])
 def delete_subject(id):
 
@@ -197,27 +212,25 @@ def delete_subject(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM subjects WHERE id=%s", (id,))
+    subject = cursor.fetchone()
 
     if not subject:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔐 فحص الصلاحية
     if not has_level_access(conn, subject["level_id"]):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
-    conn.execute(
-        "DELETE FROM subjects WHERE id=%s",
-        (id,)
-    )
-
+    cursor.execute("DELETE FROM subjects WHERE id=%s", (id,))
     conn.commit()
+
+    cursor.close()
     conn.close()
 
     return redirect(f"/level/{subject['level_id']}")

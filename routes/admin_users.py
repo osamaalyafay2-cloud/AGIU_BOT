@@ -2,6 +2,7 @@ from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
 from werkzeug.security import generate_password_hash
+from psycopg2.extras import RealDictCursor
 
 admin_users_bp = Blueprint("admin_users", __name__)
 
@@ -33,7 +34,12 @@ def users_list():
         return check
 
     conn = get_db()
-    users = conn.execute("SELECT * FROM users").fetchall()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute("SELECT * FROM users")
+    users = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     body = """
@@ -51,13 +57,11 @@ def users_list():
         <a class="btn edit" href="/admin/edit_user/{u['id']}">تعديل</a>
         """
 
-        # فقط user لديه صفحة صلاحيات
         if u["role"] == "user":
             body += f"""
             <a class="btn open" href="/admin/permissions/{u['id']}">الصلاحيات</a>
             """
 
-        # منع حذف نفسك
         if u["id"] != session["user_id"]:
             body += f"""
             <form method="post" action="/admin/delete_user/{u['id']}" style="display:inline;">
@@ -94,24 +98,28 @@ def add_user():
             return "يجب إدخال اسم المستخدم وكلمة المرور"
 
         conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        existing = conn.execute(
+        cursor.execute(
             "SELECT id FROM users WHERE username=%s",
             (username,)
-        ).fetchone()
+        )
+        existing = cursor.fetchone()
 
         if existing:
+            cursor.close()
             conn.close()
             return "اسم المستخدم موجود مسبقاً"
 
         hashed = generate_password_hash(password)
 
-        conn.execute(
+        cursor.execute(
             "INSERT INTO users(username,password,role) VALUES(%s,%s,%s)",
             (username, hashed, role)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect("/admin/users")
@@ -155,9 +163,13 @@ def delete_user(id):
         return "لا يمكنك حذف نفسك"
 
     conn = get_db()
-    conn.execute("DELETE FROM users WHERE id=%s", (id,))
-    conn.execute("DELETE FROM user_permissions WHERE user_id=%s", (id,))
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM users WHERE id=%s", (id,))
+    cursor.execute("DELETE FROM user_permissions WHERE user_id=%s", (id,))
+
     conn.commit()
+    cursor.close()
     conn.close()
 
     return redirect("/admin/users")
@@ -175,13 +187,13 @@ def edit_user(id):
         return check
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    user = conn.execute(
-        "SELECT * FROM users WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM users WHERE id=%s", (id,))
+    user = cursor.fetchone()
 
     if not user:
+        cursor.close()
         conn.close()
         return "المستخدم غير موجود"
 
@@ -189,26 +201,27 @@ def edit_user(id):
 
         role = request.form.get("role")
 
-        # منع تغيير آخر super_admin إلى user
         if user["role"] == "super_admin":
-            admins_count = conn.execute(
-                "SELECT COUNT(*) as c FROM users WHERE role='super_admin'"
-            ).fetchone()["c"]
+            cursor.execute("SELECT COUNT(*) as c FROM users WHERE role='super_admin'")
+            admins_count = cursor.fetchone()["c"]
 
             if admins_count == 1 and role != "super_admin":
+                cursor.close()
                 conn.close()
                 return "لا يمكن إزالة آخر مشرف عام"
 
-        conn.execute(
+        cursor.execute(
             "UPDATE users SET role=%s WHERE id=%s",
             (role, id)
         )
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect("/admin/users")
 
+    cursor.close()
     conn.close()
 
     return render("تعديل مستخدم", f"""
@@ -233,7 +246,7 @@ def edit_user(id):
 
 
 # ======================================================
-# إدارة صلاحيات المستخدم (فقط user)
+# إدارة صلاحيات المستخدم
 # ======================================================
 
 @admin_users_bp.route("/admin/permissions/<int:user_id>", methods=["GET", "POST"])
@@ -244,17 +257,18 @@ def manage_permissions(user_id):
         return check
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    user = conn.execute(
-        "SELECT * FROM users WHERE id=%s",
-        (user_id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
+    user = cursor.fetchone()
 
     if not user:
+        cursor.close()
         conn.close()
         return "المستخدم غير موجود"
 
     if user["role"] != "user":
+        cursor.close()
         conn.close()
         return "المشرف العام لا يحتاج صلاحيات"
 
@@ -264,41 +278,50 @@ def manage_permissions(user_id):
         year_id = request.form["year_id"]
         level_id = request.form["level_id"]
 
-        existing = conn.execute("""
+        cursor.execute("""
             SELECT id FROM user_permissions
             WHERE user_id=%s AND level_id=%s
-        """, (user_id, level_id)).fetchone()
+        """, (user_id, level_id))
+
+        existing = cursor.fetchone()
 
         if not existing:
-            conn.execute("""
+            cursor.execute("""
                 INSERT INTO user_permissions(user_id, department_id, year_id, level_id)
                 VALUES(%s,%s,%s,%s)
             """, (user_id, department_id, year_id, level_id))
             conn.commit()
 
+        cursor.close()
         conn.close()
         return redirect(f"/admin/permissions/{user_id}")
 
-    departments = conn.execute("SELECT * FROM departments").fetchall()
-    years = conn.execute("SELECT * FROM years").fetchall()
-    levels = conn.execute("SELECT * FROM levels").fetchall()
+    cursor.execute("SELECT * FROM departments")
+    departments = cursor.fetchall()
 
-    permissions = conn.execute("""
+    cursor.execute("SELECT * FROM years")
+    years = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM levels")
+    levels = cursor.fetchall()
+
+    cursor.execute("""
         SELECT up.id, d.name as dept, y.name as year, l.name as level
         FROM user_permissions up
         JOIN departments d ON up.department_id=d.id
         JOIN years y ON up.year_id=y.id
         JOIN levels l ON up.level_id=l.id
         WHERE up.user_id=%s
-    """, (user_id,)).fetchall()
+    """, (user_id,))
+    permissions = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     body = f"""
     <a class="btn open" href="/admin/users">⬅ رجوع</a>
     <hr>
     <h3>إضافة صلاحية</h3>
-
     <form method="post">
     القسم:
     <select name="department_id">
@@ -307,19 +330,17 @@ def manage_permissions(user_id):
     for d in departments:
         body += f'<option value="{d["id"]}">{d["name"]}</option>'
 
-    body += "</select><br><br>"
+    body += "</select><br><br>العام:<select name='year_id'>"
 
-    body += "العام:<select name='year_id'>"
     for y in years:
         body += f'<option value="{y["id"]}">{y["name"]}</option>'
-    body += "</select><br><br>"
 
-    body += "المستوى:<select name='level_id'>"
+    body += "</select><br><br>المستوى:<select name='level_id'>"
+
     for l in levels:
         body += f'<option value="{l["id"]}">{l["name"]}</option>'
-    body += "</select><br><br>"
 
-    body += "<button class='btn add'>حفظ</button></form><hr><h3>الصلاحيات الحالية</h3>"
+    body += "</select><br><br><button class='btn add'>حفظ</button></form><hr><h3>الصلاحيات الحالية</h3>"
 
     for p in permissions:
         body += f"""
@@ -346,8 +367,12 @@ def delete_permission(id):
         return check
 
     conn = get_db()
-    conn.execute("DELETE FROM user_permissions WHERE id=%s", (id,))
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM user_permissions WHERE id=%s", (id,))
     conn.commit()
+
+    cursor.close()
     conn.close()
 
     return redirect(request.referrer)

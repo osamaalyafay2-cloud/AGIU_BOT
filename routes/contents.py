@@ -2,6 +2,7 @@ from flask import Blueprint, request, redirect, send_from_directory, current_app
 from database import get_db
 from routes.shared import render
 from werkzeug.utils import secure_filename
+from psycopg2.extras import RealDictCursor
 import os
 import time
 
@@ -15,10 +16,15 @@ def has_level_access(conn, level_id):
     if session.get("role") == "super_admin":
         return True
 
-    allowed = conn.execute("""
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute("""
         SELECT 1 FROM user_permissions
         WHERE user_id=%s AND level_id=%s
-    """, (session.get("user_id"), level_id)).fetchone()
+    """, (session.get("user_id"), level_id))
+
+    allowed = cursor.fetchone()
+    cursor.close()
 
     return allowed is not None
 
@@ -33,26 +39,25 @@ def view_subject(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM subjects WHERE id=%s", (id,))
+    subject = cursor.fetchone()
 
     if not subject:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    # 🔒 منع الدخول لمادة خارج نطاق المستوى
     if not has_level_access(conn, subject["level_id"]):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
-    contents = conn.execute(
-        "SELECT * FROM contents WHERE subject_id=%s",
-        (id,)
-    ).fetchall()
+    cursor.execute("SELECT * FROM contents WHERE subject_id=%s", (id,))
+    contents = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     body = f"""
@@ -96,17 +101,18 @@ def add_content(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM subjects WHERE id=%s", (id,))
+    subject = cursor.fetchone()
 
     if not subject:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
     if not has_level_access(conn, subject["level_id"]):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
@@ -118,15 +124,16 @@ def add_content(id):
         file = request.files.get("file")
 
         if not title or not type_:
+            cursor.close()
             conn.close()
             return "يجب إدخال العنوان والنوع"
 
         if not file or file.filename == "":
+            cursor.close()
             conn.close()
             return "يجب اختيار ملف"
 
         original_name = secure_filename(file.filename)
-
         ext = os.path.splitext(original_name)[1]
         filename = f"{int(time.time())}{ext}"
 
@@ -138,19 +145,19 @@ def add_content(id):
         file_size = os.path.getsize(filepath)
         mime_type = file.mimetype
 
-        conn.execute("""
+        cursor.execute("""
             INSERT INTO contents
             (title, description, type, file_path, file_size, mime_type, subject_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-        (title, description, type_, filepath, file_size, mime_type, id)
-        )
+        """, (title, description, type_, filepath, file_size, mime_type, id))
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(f"/subject/{id}")
 
+    cursor.close()
     conn.close()
 
     return render("رفع محتوى", f"""
@@ -186,45 +193,44 @@ def edit_content(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    content = conn.execute(
-        "SELECT * FROM contents WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM contents WHERE id=%s", (id,))
+    content = cursor.fetchone()
 
     if not content:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=%s",
-        (content["subject_id"],)
-    ).fetchone()
+    cursor.execute("SELECT * FROM subjects WHERE id=%s", (content["subject_id"],))
+    subject = cursor.fetchone()
 
     if not has_level_access(conn, subject["level_id"]):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
     if request.method == "POST":
 
-        conn.execute("""
+        cursor.execute("""
             UPDATE contents
             SET title=%s, description=%s, type=%s
             WHERE id=%s
-        """,
-        (
+        """, (
             request.form["title"],
             request.form.get("description", ""),
             request.form["type"],
             id
-        )
-        )
+        ))
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(f"/subject/{content['subject_id']}")
 
+    cursor.close()
     conn.close()
 
     return render("تعديل محتوى", f"""
@@ -255,34 +261,31 @@ def delete_content(id):
         return redirect("/login")
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    content = conn.execute(
-        "SELECT * FROM contents WHERE id=%s",
-        (id,)
-    ).fetchone()
+    cursor.execute("SELECT * FROM contents WHERE id=%s", (id,))
+    content = cursor.fetchone()
 
     if not content:
+        cursor.close()
         conn.close()
         return "العنصر غير موجود"
 
-    subject = conn.execute(
-        "SELECT * FROM subjects WHERE id=%s",
-        (content["subject_id"],)
-    ).fetchone()
+    cursor.execute("SELECT * FROM subjects WHERE id=%s", (content["subject_id"],))
+    subject = cursor.fetchone()
 
     if not has_level_access(conn, subject["level_id"]):
+        cursor.close()
         conn.close()
         return "غير مصرح لك"
 
     if os.path.exists(content["file_path"]):
         os.remove(content["file_path"])
 
-    conn.execute(
-        "DELETE FROM contents WHERE id=%s",
-        (id,)
-    )
+    cursor.execute("DELETE FROM contents WHERE id=%s", (id,))
 
     conn.commit()
+    cursor.close()
     conn.close()
 
     return redirect(f"/subject/{content['subject_id']}")

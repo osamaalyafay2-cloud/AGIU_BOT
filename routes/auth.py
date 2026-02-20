@@ -17,10 +17,13 @@ def login():
         password = request.form.get("password")
 
         conn = get_db()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username=%s",
-            (username,)
-        ).fetchone()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id, username, password, role FROM users WHERE username=%s",(username,))
+
+        user = cursor.fetchone()
+
+        cursor.close()
         conn.close()
 
         # إذا لم يوجد مستخدم

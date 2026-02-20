@@ -1,20 +1,6 @@
 from flask import session, redirect
-import sqlite3
-import os
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATABASE = os.path.join(BASE_DIR, "university.db")
-
-# ==========================================
-# الاتصال بقاعدة البيانات
-# ==========================================
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
-
+from database import get_db
+from psycopg2.extras import RealDictCursor
 
 # ==========================================
 # التصميم الموحد
@@ -116,18 +102,17 @@ def require_super_admin():
 
 def check_user_permission(department_id=None, year_id=None, level_id=None):
 
-    # السوبر أدمن يتجاوز كل شيء
     if session.get("role") == "super_admin":
         return True
 
     user_id = session.get("user_id")
-
     if not user_id:
         return False
 
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    query = "SELECT * FROM user_permissions WHERE user_id=%s"
+    query = "SELECT 1 FROM user_permissions WHERE user_id=%s"
     params = [user_id]
 
     if department_id:
@@ -142,26 +127,33 @@ def check_user_permission(department_id=None, year_id=None, level_id=None):
         query += " AND level_id=%s"
         params.append(level_id)
 
-    row = conn.execute(query, params).fetchone()
+    cursor.execute(query, tuple(params))
+    row = cursor.fetchone()
+
+    cursor.close()
     conn.close()
 
-    return True if row else False
+    return row is not None
+
 
 # ==========================================
 # فحص صلاحية المستخدم على مستوى معين
 # ==========================================
+
 def has_permission(user_id, level_id):
 
-    from database import get_db
-
     conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-    row = conn.execute("""
-        SELECT *
+    cursor.execute("""
+        SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND level_id=%s
-    """, (user_id, level_id)).fetchone()
+    """, (user_id, level_id))
 
+    row = cursor.fetchone()
+
+    cursor.close()
     conn.close()
 
     return row is not None
