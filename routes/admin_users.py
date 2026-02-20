@@ -2,10 +2,8 @@ from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
 from werkzeug.security import generate_password_hash
-from psycopg2.extras import RealDictCursor
 
 admin_users_bp = Blueprint("admin_users", __name__)
-
 
 # ======================================================
 # دالة مساعدة: التحقق من المشرف العام
@@ -33,14 +31,9 @@ def users_list():
     if check:
         return check
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    cursor.execute("SELECT * FROM users")
-    users = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    db = get_db()
+    users = db.execute("SELECT * FROM users").fetchall()
+    db.close()
 
     body = """
     <a class="btn add" href="/admin/add_user">➕ إضافة مستخدم</a>
@@ -97,53 +90,42 @@ def add_user():
         if not username or not password:
             return "يجب إدخال اسم المستخدم وكلمة المرور"
 
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        db = get_db()
 
-        cursor.execute(
+        existing = db.execute(
             "SELECT id FROM users WHERE username=%s",
             (username,)
-        )
-        existing = cursor.fetchone()
+        ).fetchone()
 
         if existing:
-            cursor.close()
-            conn.close()
+            db.close()
             return "اسم المستخدم موجود مسبقاً"
 
         hashed = generate_password_hash(password)
 
-        cursor.execute(
+        db.execute(
             "INSERT INTO users(username,password,role) VALUES(%s,%s,%s)",
             (username, hashed, role)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect("/admin/users")
 
     return render("إضافة مستخدم", """
     <a class="btn open" href="/admin/users">⬅ رجوع</a>
-
     <form method="post">
-
     اسم المستخدم:
     <input name="username" required>
-
     كلمة المرور:
     <input type="password" name="password" required>
-
     الدور:
     <select name="role">
         <option value="user">user</option>
         <option value="super_admin">super_admin</option>
     </select>
-
     <br><br>
     <button class="btn add">حفظ</button>
-
     </form>
     """)
 
@@ -162,15 +144,11 @@ def delete_user(id):
     if id == session["user_id"]:
         return "لا يمكنك حذف نفسك"
 
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM users WHERE id=%s", (id,))
-    cursor.execute("DELETE FROM user_permissions WHERE user_id=%s", (id,))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    db = get_db()
+    db.execute("DELETE FROM users WHERE id=%s", (id,))
+    db.execute("DELETE FROM user_permissions WHERE user_id=%s", (id,))
+    db.commit()
+    db.close()
 
     return redirect("/admin/users")
 
@@ -186,15 +164,15 @@ def edit_user(id):
     if check:
         return check
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM users WHERE id=%s", (id,))
-    user = cursor.fetchone()
+    user = db.execute(
+        "SELECT * FROM users WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not user:
-        cursor.close()
-        conn.close()
+        db.close()
         return "المستخدم غير موجود"
 
     if request.method == "POST":
@@ -202,51 +180,43 @@ def edit_user(id):
         role = request.form.get("role")
 
         if user["role"] == "super_admin":
-            cursor.execute("SELECT COUNT(*) as c FROM users WHERE role='super_admin'")
-            admins_count = cursor.fetchone()["c"]
+            admins_count = db.execute(
+                "SELECT COUNT(*) as c FROM users WHERE role='super_admin'"
+            ).fetchone()["c"]
 
             if admins_count == 1 and role != "super_admin":
-                cursor.close()
-                conn.close()
+                db.close()
                 return "لا يمكن إزالة آخر مشرف عام"
 
-        cursor.execute(
+        db.execute(
             "UPDATE users SET role=%s WHERE id=%s",
             (role, id)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect("/admin/users")
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     return render("تعديل مستخدم", f"""
     <a class="btn open" href="/admin/users">⬅ رجوع</a>
-
     <form method="post">
-
     اسم المستخدم:
     <input value="{user['username']}" disabled>
-
     الدور:
     <select name="role">
         <option value="user" {"selected" if user['role']=="user" else ""}>user</option>
         <option value="super_admin" {"selected" if user['role']=="super_admin" else ""}>super_admin</option>
     </select>
-
     <br><br>
     <button class="btn edit">تحديث</button>
-
     </form>
     """)
 
 
 # ======================================================
-# إدارة صلاحيات المستخدم
+# إدارة الصلاحيات
 # ======================================================
 
 @admin_users_bp.route("/admin/permissions/<int:user_id>", methods=["GET", "POST"])
@@ -256,20 +226,19 @@ def manage_permissions(user_id):
     if check:
         return check
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
-    user = cursor.fetchone()
+    user = db.execute(
+        "SELECT * FROM users WHERE id=%s",
+        (user_id,)
+    ).fetchone()
 
     if not user:
-        cursor.close()
-        conn.close()
+        db.close()
         return "المستخدم غير موجود"
 
     if user["role"] != "user":
-        cursor.close()
-        conn.close()
+        db.close()
         return "المشرف العام لا يحتاج صلاحيات"
 
     if request.method == "POST":
@@ -278,53 +247,42 @@ def manage_permissions(user_id):
         year_id = request.form["year_id"]
         level_id = request.form["level_id"]
 
-        cursor.execute("""
+        existing = db.execute("""
             SELECT id FROM user_permissions
             WHERE user_id=%s AND level_id=%s
-        """, (user_id, level_id))
-
-        existing = cursor.fetchone()
+        """, (user_id, level_id)).fetchone()
 
         if not existing:
-            cursor.execute("""
+            db.execute("""
                 INSERT INTO user_permissions(user_id, department_id, year_id, level_id)
                 VALUES(%s,%s,%s,%s)
             """, (user_id, department_id, year_id, level_id))
-            conn.commit()
+            db.commit()
 
-        cursor.close()
-        conn.close()
+        db.close()
         return redirect(f"/admin/permissions/{user_id}")
 
-    cursor.execute("SELECT * FROM departments")
-    departments = cursor.fetchall()
+    departments = db.execute("SELECT * FROM departments").fetchall()
+    years = db.execute("SELECT * FROM years").fetchall()
+    levels = db.execute("SELECT * FROM levels").fetchall()
 
-    cursor.execute("SELECT * FROM years")
-    years = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM levels")
-    levels = cursor.fetchall()
-
-    cursor.execute("""
+    permissions = db.execute("""
         SELECT up.id, d.name as dept, y.name as year, l.name as level
         FROM user_permissions up
         JOIN departments d ON up.department_id=d.id
         JOIN years y ON up.year_id=y.id
         JOIN levels l ON up.level_id=l.id
         WHERE up.user_id=%s
-    """, (user_id,))
-    permissions = cursor.fetchall()
+    """, (user_id,)).fetchall()
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     body = f"""
     <a class="btn open" href="/admin/users">⬅ رجوع</a>
     <hr>
     <h3>إضافة صلاحية</h3>
     <form method="post">
-    القسم:
-    <select name="department_id">
+    القسم:<select name="department_id">
     """
 
     for d in departments:
@@ -366,13 +324,9 @@ def delete_permission(id):
     if check:
         return check
 
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM user_permissions WHERE id=%s", (id,))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
+    db = get_db()
+    db.execute("DELETE FROM user_permissions WHERE id=%s", (id,))
+    db.commit()
+    db.close()
 
     return redirect(request.referrer)

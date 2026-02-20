@@ -1,7 +1,6 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
-from psycopg2.extras import RealDictCursor
 
 subjects_bp = Blueprint("subjects", __name__)
 
@@ -9,20 +8,15 @@ subjects_bp = Blueprint("subjects", __name__)
 # دالة مساعدة لفحص صلاحية المستوى
 # ======================================================
 
-def has_level_access(conn, level_id):
+def has_level_access(db, level_id):
 
     if session.get("role") == "super_admin":
         return True
 
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    cursor.execute("""
+    allowed = db.execute("""
         SELECT 1 FROM user_permissions
         WHERE user_id=%s AND level_id=%s
-    """, (session.get("user_id"), level_id))
-
-    allowed = cursor.fetchone()
-    cursor.close()
+    """, (session.get("user_id"), level_id)).fetchone()
 
     return allowed is not None
 
@@ -37,27 +31,27 @@ def view_level(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
-    level = cursor.fetchone()
+    level = db.execute(
+        "SELECT * FROM levels WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not level:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_level_access(conn, id):
-        cursor.close()
-        conn.close()
+    if not has_level_access(db, id):
+        db.close()
         return "غير مصرح لك"
 
-    cursor.execute("SELECT * FROM subjects WHERE level_id=%s", (id,))
-    subjects = cursor.fetchall()
+    subjects = db.execute(
+        "SELECT * FROM subjects WHERE level_id=%s",
+        (id,)
+    ).fetchall()
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     body = f"""
     <a class="btn open" href="/year/{level['year_id']}">⬅ رجوع</a>
@@ -94,20 +88,19 @@ def add_subject(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM levels WHERE id=%s", (id,))
-    level = cursor.fetchone()
+    level = db.execute(
+        "SELECT * FROM levels WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not level:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_level_access(conn, id):
-        cursor.close()
-        conn.close()
+    if not has_level_access(db, id):
+        db.close()
         return "غير مصرح لك"
 
     if request.method == "POST":
@@ -115,23 +108,20 @@ def add_subject(id):
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
+            db.close()
             return "يجب إدخال اسم المادة"
 
-        cursor.execute(
+        db.execute(
             "INSERT INTO subjects(name, level_id) VALUES(%s,%s)",
             (name, id)
         )
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect(f"/level/{id}")
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     return render("إضافة مادة", f"""
     <a class="btn open" href="/level/{id}">⬅ رجوع</a>
@@ -153,20 +143,19 @@ def edit_subject(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM subjects WHERE id=%s", (id,))
-    subject = cursor.fetchone()
+    subject = db.execute(
+        "SELECT * FROM subjects WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not subject:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_level_access(conn, subject["level_id"]):
-        cursor.close()
-        conn.close()
+    if not has_level_access(db, subject["level_id"]):
+        db.close()
         return "غير مصرح لك"
 
     if request.method == "POST":
@@ -174,23 +163,20 @@ def edit_subject(id):
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
+            db.close()
             return "يجب إدخال اسم المادة"
 
-        cursor.execute(
+        db.execute(
             "UPDATE subjects SET name=%s WHERE id=%s",
             (name, id)
         )
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect(f"/level/{subject['level_id']}")
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     return render("تعديل مادة", f"""
     <form method="post">
@@ -211,26 +197,23 @@ def delete_subject(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM subjects WHERE id=%s", (id,))
-    subject = cursor.fetchone()
+    subject = db.execute(
+        "SELECT * FROM subjects WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not subject:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_level_access(conn, subject["level_id"]):
-        cursor.close()
-        conn.close()
+    if not has_level_access(db, subject["level_id"]):
+        db.close()
         return "غير مصرح لك"
 
-    cursor.execute("DELETE FROM subjects WHERE id=%s", (id,))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
+    db.execute("DELETE FROM subjects WHERE id=%s", (id,))
+    db.commit()
+    db.close()
 
     return redirect(f"/level/{subject['level_id']}")

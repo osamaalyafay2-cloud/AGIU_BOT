@@ -1,7 +1,6 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
-from psycopg2.extras import RealDictCursor
 
 years_bp = Blueprint("years", __name__)
 
@@ -13,40 +12,30 @@ def is_admin():
     return session.get("role") == "super_admin"
 
 
-def has_department_access(conn, department_id):
+def has_department_access(db, department_id):
 
     if is_admin():
         return True
 
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    cursor.execute("""
+    allowed = db.execute("""
         SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND department_id=%s
-    """, (session.get("user_id"), department_id))
-
-    allowed = cursor.fetchone()
-    cursor.close()
+    """, (session.get("user_id"), department_id)).fetchone()
 
     return allowed is not None
 
 
-def has_year_access(conn, year_id):
+def has_year_access(db, year_id):
 
     if is_admin():
         return True
 
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    cursor.execute("""
+    allowed = db.execute("""
         SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND year_id=%s
-    """, (session.get("user_id"), year_id))
-
-    allowed = cursor.fetchone()
-    cursor.close()
+    """, (session.get("user_id"), year_id)).fetchone()
 
     return allowed is not None
 
@@ -61,36 +50,35 @@ def view_department(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM departments WHERE id=%s", (id,))
-    department = cursor.fetchone()
+    department = db.execute(
+        "SELECT * FROM departments WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not department:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_department_access(conn, id):
-        cursor.close()
-        conn.close()
+    if not has_department_access(db, id):
+        db.close()
         return "غير مصرح لك"
 
     if is_admin():
-        cursor.execute("SELECT * FROM years WHERE department_id=%s", (id,))
+        years = db.execute(
+            "SELECT * FROM years WHERE department_id=%s",
+            (id,)
+        ).fetchall()
     else:
-        cursor.execute("""
+        years = db.execute("""
             SELECT DISTINCT y.*
             FROM years y
             JOIN user_permissions up ON up.year_id = y.id
             WHERE y.department_id=%s AND up.user_id=%s
-        """, (id, session["user_id"]))
+        """, (id, session["user_id"])).fetchall()
 
-    years = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    db.close()
 
     body = f"""
     <a class="btn open" href="/college/{department['college_id']}">⬅ رجوع</a>
@@ -104,7 +92,6 @@ def view_department(id):
     body += "<hr>"
 
     for y in years:
-
         body += f"""
         <div class="card">
         📅 {y['name']}
@@ -138,36 +125,35 @@ def view_year(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM years WHERE id=%s", (id,))
-    year = cursor.fetchone()
+    year = db.execute(
+        "SELECT * FROM years WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not year:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_year_access(conn, id):
-        cursor.close()
-        conn.close()
+    if not has_year_access(db, id):
+        db.close()
         return "غير مصرح لك"
 
     if is_admin():
-        cursor.execute("SELECT * FROM levels WHERE year_id=%s", (id,))
+        levels = db.execute(
+            "SELECT * FROM levels WHERE year_id=%s",
+            (id,)
+        ).fetchall()
     else:
-        cursor.execute("""
+        levels = db.execute("""
             SELECT l.*
             FROM levels l
             JOIN user_permissions up ON up.level_id = l.id
             WHERE l.year_id=%s AND up.user_id=%s
-        """, (id, session["user_id"]))
+        """, (id, session["user_id"])).fetchall()
 
-    levels = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    db.close()
 
     body = f"""
     <a class="btn open" href="/department/{year['department_id']}">⬅ رجوع</a>
@@ -188,7 +174,6 @@ def view_year(id):
     body += "<hr>"
 
     for l in levels:
-
         body += f"""
         <div class="card">
         📚 {l['name']}
@@ -225,31 +210,22 @@ def add_year(id):
     if not is_admin():
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor()
-
     if request.method == "POST":
 
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
             return "يجب إدخال اسم العام"
 
-        cursor.execute(
+        db = get_db()
+        db.execute(
             "INSERT INTO years(name, department_id) VALUES(%s,%s)",
             (name, id)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect(f"/department/{id}")
-
-    cursor.close()
-    conn.close()
 
     return render("إضافة عام", f"""
     <a class="btn open" href="/department/{id}">⬅ رجوع</a>
@@ -274,15 +250,15 @@ def edit_year(id):
     if not is_admin():
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM years WHERE id=%s", (id,))
-    year = cursor.fetchone()
+    year = db.execute(
+        "SELECT * FROM years WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not year:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
     if request.method == "POST":
@@ -290,23 +266,20 @@ def edit_year(id):
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
+            db.close()
             return "يجب إدخال الاسم"
 
-        cursor.execute(
+        db.execute(
             "UPDATE years SET name=%s WHERE id=%s",
             (name, id)
         )
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect(f"/department/{year['department_id']}")
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     return render("تعديل عام", f"""
     <form method="post">
@@ -330,21 +303,19 @@ def delete_year(id):
     if not is_admin():
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM years WHERE id=%s", (id,))
-    year = cursor.fetchone()
+    year = db.execute(
+        "SELECT * FROM years WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not year:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    cursor.execute("DELETE FROM years WHERE id=%s", (id,))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
+    db.execute("DELETE FROM years WHERE id=%s", (id,))
+    db.commit()
+    db.close()
 
     return redirect(f"/department/{year['department_id']}")

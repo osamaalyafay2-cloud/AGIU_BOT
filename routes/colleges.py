@@ -1,7 +1,6 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
-from psycopg2.extras import RealDictCursor
 
 colleges_bp = Blueprint("colleges", __name__)
 
@@ -15,14 +14,9 @@ def home():
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    cursor.execute("SELECT * FROM colleges")
-    colleges = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    db = get_db()
+    colleges = db.execute("SELECT * FROM colleges").fetchall()
+    db.close()
 
     body = """
     <div style="margin-bottom:15px;">
@@ -91,17 +85,13 @@ def add_college():
         if not name:
             return "يجب إدخال اسم الكلية"
 
-        conn = get_db()
-        cursor = conn.cursor()
-
-        cursor.execute(
+        db = get_db()
+        db.execute(
             "INSERT INTO colleges(name) VALUES(%s)",
             (name,)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect("/")
 
@@ -130,43 +120,34 @@ def edit_college(id):
     if session.get("role") != "super_admin":
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
     if request.method == "POST":
 
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
+            db.close()
             return "يجب إدخال الاسم"
 
-        cursor.execute(
+        db.execute(
             "UPDATE colleges SET name=%s WHERE id=%s",
             (name, id)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect("/")
 
-    cursor.execute(
+    college = db.execute(
         "SELECT * FROM colleges WHERE id=%s",
         (id,)
-    )
+    ).fetchone()
 
-    college = cursor.fetchone()
+    db.close()
 
     if not college:
-        cursor.close()
-        conn.close()
         return "العنصر غير موجود"
-
-    cursor.close()
-    conn.close()
 
     body = f"""
     <a class="btn open" href="/">⬅ رجوع</a>
@@ -193,16 +174,12 @@ def delete_college(id):
     if session.get("role") != "super_admin":
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
+    db = get_db()
+    db.execute(
         "DELETE FROM colleges WHERE id=%s",
         (id,)
     )
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    db.commit()
+    db.close()
 
     return redirect("/")

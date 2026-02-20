@@ -1,6 +1,5 @@
 from flask import session, redirect
 from database import get_db
-from psycopg2.extras import RealDictCursor
 
 # ==========================================
 # التصميم الموحد
@@ -109,8 +108,7 @@ def check_user_permission(department_id=None, year_id=None, level_id=None):
     if not user_id:
         return False
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
     query = "SELECT 1 FROM user_permissions WHERE user_id=%s"
     params = [user_id]
@@ -127,11 +125,9 @@ def check_user_permission(department_id=None, year_id=None, level_id=None):
         query += " AND level_id=%s"
         params.append(level_id)
 
-    cursor.execute(query, tuple(params))
-    row = cursor.fetchone()
+    row = db.execute(query, tuple(params)).fetchone()
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     return row is not None
 
@@ -142,18 +138,14 @@ def check_user_permission(department_id=None, year_id=None, level_id=None):
 
 def has_permission(user_id, level_id):
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("""
+    row = db.execute("""
         SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND level_id=%s
-    """, (user_id, level_id))
+    """, (user_id, level_id)).fetchone()
 
-    row = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
+    db.close()
 
     return row is not None

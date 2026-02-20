@@ -1,7 +1,6 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from routes.shared import render
-from psycopg2.extras import RealDictCursor
 
 departments_bp = Blueprint("departments", __name__)
 
@@ -13,21 +12,16 @@ def is_admin():
     return session.get("role") == "super_admin"
 
 
-def has_department_access(conn, department_id):
+def has_department_access(db, department_id):
 
     if is_admin():
         return True
 
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    cursor.execute("""
+    allowed = db.execute("""
         SELECT 1
         FROM user_permissions
         WHERE user_id=%s AND department_id=%s
-    """, (session.get("user_id"), department_id))
-
-    allowed = cursor.fetchone()
-    cursor.close()
+    """, (session.get("user_id"), department_id)).fetchone()
 
     return allowed is not None
 
@@ -42,34 +36,31 @@ def view_college(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM colleges WHERE id=%s", (id,))
-    college = cursor.fetchone()
+    college = db.execute(
+        "SELECT * FROM colleges WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not college:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
     if is_admin():
-        cursor.execute(
+        departments = db.execute(
             "SELECT * FROM departments WHERE college_id=%s",
             (id,)
-        )
+        ).fetchall()
     else:
-        cursor.execute("""
+        departments = db.execute("""
             SELECT DISTINCT d.*
             FROM departments d
             JOIN user_permissions up ON up.department_id=d.id
             WHERE d.college_id=%s AND up.user_id=%s
-        """, (id, session["user_id"]))
+        """, (id, session["user_id"])).fetchall()
 
-    departments = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    db.close()
 
     body = f"""
     <a class="btn open" href="/">⬅ رجوع</a>
@@ -117,27 +108,27 @@ def view_department(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM departments WHERE id=%s", (id,))
-    department = cursor.fetchone()
+    department = db.execute(
+        "SELECT * FROM departments WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not department:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    if not has_department_access(conn, id):
-        cursor.close()
-        conn.close()
+    if not has_department_access(db, id):
+        db.close()
         return "غير مصرح لك"
 
-    cursor.execute("SELECT * FROM years WHERE department_id=%s", (id,))
-    years = cursor.fetchall()
+    years = db.execute(
+        "SELECT * FROM years WHERE department_id=%s",
+        (id,)
+    ).fetchall()
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     body = f"""
     <a class="btn open" href="/college/{department['college_id']}">⬅ رجوع</a>
@@ -188,31 +179,22 @@ def add_department(id):
     if not is_admin():
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor()
-
     if request.method == "POST":
 
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
             return "يجب إدخال اسم القسم"
 
-        cursor.execute(
+        db = get_db()
+        db.execute(
             "INSERT INTO departments(name,college_id) VALUES(%s,%s)",
             (name, id)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect(f"/college/{id}")
-
-    cursor.close()
-    conn.close()
 
     return render("إضافة قسم", f"""
     <a class="btn open" href="/college/{id}">⬅ رجوع</a>
@@ -237,15 +219,15 @@ def edit_department(id):
     if not is_admin():
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT * FROM departments WHERE id=%s", (id,))
-    dept = cursor.fetchone()
+    dept = db.execute(
+        "SELECT * FROM departments WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not dept:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
     if request.method == "POST":
@@ -253,23 +235,19 @@ def edit_department(id):
         name = request.form.get("name", "").strip()
 
         if not name:
-            cursor.close()
-            conn.close()
+            db.close()
             return "يجب إدخال الاسم"
 
-        cursor.execute(
+        db.execute(
             "UPDATE departments SET name=%s WHERE id=%s",
             (name, id)
         )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.close()
 
         return redirect(f"/college/{dept['college_id']}")
 
-    cursor.close()
-    conn.close()
+    db.close()
 
     return render("تعديل قسم", f"""
     <form method="post">
@@ -293,21 +271,19 @@ def delete_department(id):
     if not is_admin():
         return "غير مصرح لك"
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    db = get_db()
 
-    cursor.execute("SELECT college_id FROM departments WHERE id=%s", (id,))
-    dept = cursor.fetchone()
+    dept = db.execute(
+        "SELECT college_id FROM departments WHERE id=%s",
+        (id,)
+    ).fetchone()
 
     if not dept:
-        cursor.close()
-        conn.close()
+        db.close()
         return "العنصر غير موجود"
 
-    cursor.execute("DELETE FROM departments WHERE id=%s", (id,))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    db.execute("DELETE FROM departments WHERE id=%s", (id,))
+    db.commit()
+    db.close()
 
     return redirect(f"/college/{dept['college_id']}")
