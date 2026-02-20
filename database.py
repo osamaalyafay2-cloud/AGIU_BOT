@@ -4,13 +4,18 @@ from psycopg2.extras import RealDictCursor
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set in environment variables")
+
 class DBWrapper:
     def __init__(self):
-        self.conn = psycopg2.connect(DATABASE_URL)
+        self.conn = psycopg2.connect(
+            DATABASE_URL,
+            connect_timeout=5
+        )
         self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
 
     def execute(self, query, params=None):
-        # تحويل %s كما هو (متوافق أصلاً)
         self.cursor.execute(query, params or ())
         return self
 
