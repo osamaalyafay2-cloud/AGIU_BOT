@@ -2,10 +2,6 @@ from flask import Flask
 from config import UPLOAD_FOLDER
 import os
 
-# =====================================================
-# استيراد الـ Blueprints
-# =====================================================
-
 from routes.admin_users import admin_users_bp
 from routes.colleges import colleges_bp
 from routes.departments import departments_bp
@@ -16,40 +12,34 @@ from routes.contents import contents_bp
 from routes.auth import auth_bp
 
 
-# =====================================================
-# إنشاء تطبيق Flask
-# =====================================================
+# ==========================================
+# إنشاء التطبيق
+# ==========================================
 
-def create_app():
-    app = Flask(__name__)
+app = Flask(__name__)
 
-    # إعدادات أساسية
-    app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-    app.secret_key = os.environ.get("SECRET_KEY", "super_secret_key")
-
-    # تسجيل الـ Blueprints
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(colleges_bp)
-    app.register_blueprint(departments_bp)
-    app.register_blueprint(years_bp)
-    app.register_blueprint(levels_bp)
-    app.register_blueprint(subjects_bp)
-    app.register_blueprint(contents_bp)
-    app.register_blueprint(admin_users_bp)
-
-    return app
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.secret_key = os.environ.get("SECRET_KEY", "super_secret_key")
 
 
-# =====================================================
-# إنشاء التطبيق للتشغيل عبر Gunicorn
-# =====================================================
+# ==========================================
+# تسجيل الـ Blueprints
+# ==========================================
 
-app = create_app()
+app.register_blueprint(auth_bp)
+app.register_blueprint(colleges_bp)
+app.register_blueprint(departments_bp)
+app.register_blueprint(years_bp)
+app.register_blueprint(levels_bp)
+app.register_blueprint(subjects_bp)
+app.register_blueprint(contents_bp)
+app.register_blueprint(admin_users_bp)
 
 
-# =====================================================
-# تشغيل محلي فقط (للتجربة على جهازك)
-# =====================================================
+# ==========================================
+# تشغيل محلي فقط
+# ==========================================
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
