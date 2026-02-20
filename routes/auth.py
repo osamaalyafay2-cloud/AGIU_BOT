@@ -20,18 +20,11 @@ def login():
         if not username or not password:
             return "يجب إدخال اسم المستخدم وكلمة المرور"
 
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        db = get_db()
 
-        cursor.execute(
-            "SELECT id, username, password, role FROM users WHERE username=%s",
-            (username,)
-        )
+        user = (db.execute("SELECT id, username, password, role FROM users WHERE username=%s",(username,)).fetchone())
 
-        user = cursor.fetchone()
-
-        cursor.close()
-        conn.close()
+        db.close()
 
         # إذا لم يوجد مستخدم
         if not user:
