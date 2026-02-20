@@ -782,17 +782,6 @@ register_student_handlers(app, get_db)
 
 
 
-import asyncio
-
 def start_bot():
-    from telegram.ext import ApplicationBuilder
-    import os
-
-    TOKEN = os.environ.get("TOKEN")
-    print("Bot token:", TOKEN)
-
-    application = ApplicationBuilder().token(TOKEN).build()
-
-    # أضف الهاندلرز هنا إذا كانت خارج الدالة
-
-    asyncio.run(application.run_polling())
+    print("Bot starting...")
+    app.run_polling()
