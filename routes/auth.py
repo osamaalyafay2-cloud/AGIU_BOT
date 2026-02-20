@@ -1,6 +1,7 @@
 from flask import Blueprint, request, redirect, session
 from database import get_db
 from werkzeug.security import check_password_hash
+from psycopg2.extras import RealDictCursor
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -8,18 +9,24 @@ auth_bp = Blueprint("auth", __name__)
 # تسجيل الدخول
 # ======================
 
-@auth_bp.route("/login", methods=["GET","POST"])
+@auth_bp.route("/login", methods=["GET", "POST"])
 def login():
 
     if request.method == "POST":
 
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if not username or not password:
+            return "يجب إدخال اسم المستخدم وكلمة المرور"
 
         conn = get_db()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        cursor.execute("SELECT id, username, password, role FROM users WHERE username=%s",(username,))
+        cursor.execute(
+            "SELECT id, username, password, role FROM users WHERE username=%s",
+            (username,)
+        )
 
         user = cursor.fetchone()
 
