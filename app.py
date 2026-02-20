@@ -38,22 +38,28 @@ app.register_blueprint(admin_users_bp)
 
 
 # ==========================================
-# تشغيل البوت في Thread منفصل
+# تشغيل البوت داخل Render
 # ==========================================
 
 def start_telegram_bot():
+    print("Starting Telegram bot thread...")
     from bot import start_bot
     start_bot()
 
 
-# نشغّل البوت فقط إذا لم نكن في وضع التطوير المباشر
-if os.environ.get("RENDER"):
-    threading.Thread(target=start_telegram_bot, daemon=True).start()
+# مهم: هذا الكود يُنفذ عند استيراد الملف بواسطة Gunicorn
+if os.environ.get("RENDER") == "1":
+    print("Render environment detected. Launching bot...")
+    threading.Thread(
+        target=start_telegram_bot,
+        daemon=True
+    ).start()
 
 
 # ==========================================
-# تشغيل محلي
+# تشغيل محلي فقط
 # ==========================================
 
 if __name__ == "__main__":
+    print("Running locally...")
     app.run(debug=True)
