@@ -783,6 +783,7 @@ register_student_handlers(app, get_db)
 
 
 def start_bot():
+    print("Bot token:", TOKEN)
     print("Bot started...")
 
     loop = asyncio.new_event_loop()
