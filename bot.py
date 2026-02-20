@@ -19,7 +19,7 @@ from telegram.ext import (
 
 from werkzeug.security import check_password_hash
 from student import student_start, register_student_handlers,student_handler
-
+import asyncio
 
 # ======================================================
 # إعدادات
@@ -778,6 +778,10 @@ app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VI
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_text))
 app.add_handler(CommandHandler("student", lambda u, c: student_start(u, c, get_db)))
 register_student_handlers(app, get_db)
+
+
 def start_bot():
     print("Bot started...")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     app.run_polling()
