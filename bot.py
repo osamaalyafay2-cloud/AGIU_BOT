@@ -780,8 +780,17 @@ app.add_handler(CommandHandler("student", lambda u, c: student_start(u, c, get_d
 register_student_handlers(app, get_db)
 
 
+
+
 def start_bot():
     print("Bot started...")
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    app.run_polling()
+
+    async def run():
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+
+    loop.run_until_complete(run())
