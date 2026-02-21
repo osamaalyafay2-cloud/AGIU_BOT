@@ -13,8 +13,8 @@ async def safe_edit(query, text, keyboard):
             text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    except:
-        pass
+    except Exception as e:
+        print("Edit error:", e)
 
 
 # ======================================================
@@ -23,14 +23,18 @@ async def safe_edit(query, text, keyboard):
 
 def student_init_stack(context):
     if "student_stack" not in context.user_data:
-        context.user_data["student_stack"] = []
+        context.user_data["student_stack"] = ["student_main"]
 
 def student_push(context, data):
     student_init_stack(context)
     context.user_data["student_stack"].append(data)
 
-def student_reset(context):
-    context.user_data["student_stack"] = ["student_main"]
+def student_pop(context):
+    student_init_stack(context)
+    stack = context.user_data["student_stack"]
+    if len(stack) > 1:
+        stack.pop()
+    return stack[-1]
 
 
 # ======================================================
@@ -39,7 +43,7 @@ def student_reset(context):
 
 async def student_start(update, context, get_db):
 
-    student_reset(context)
+    context.user_data["student_stack"] = ["student_main"]
 
     conn = get_db()
     try:
@@ -58,10 +62,16 @@ async def student_start(update, context, get_db):
         [InlineKeyboardButton("ℹ حول البوت", callback_data="student_about")]
     )
 
-    await update.message.reply_text(
-        "🎓 اختر الكلية:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    if update.message:
+        await update.message.reply_text(
+            "🎓 اختر الكلية:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.callback_query.edit_message_text(
+            "🎓 اختر الكلية:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 
 # ======================================================
@@ -72,35 +82,25 @@ async def student_handler(query, context, get_db):
 
     data = query.data
 
-    # مهم جداً: لا تفتح اتصال إلا إذا كان خاص بالطالب
     if not data.startswith("student_"):
         return False
 
     await query.answer()
 
+    # معالجة الرجوع
+    if data == "student_back":
+        data = student_pop(context)
+
+    else:
+        student_push(context, data)
+
     conn = get_db()
     try:
-
-        # ===============================
-        # رجوع
-        # ===============================
-        if data == "student_back":
-
-            stack = context.user_data.get("student_stack", [])
-
-            if len(stack) <= 1:
-                student_reset(context)
-                data = "student_main"
-            else:
-                stack.pop()
-                data = stack[-1]
 
         # ===============================
         # الصفحة الرئيسية
         # ===============================
         if data == "student_main":
-
-            student_reset(context)
 
             colleges = conn.execute(
                 "SELECT * FROM colleges ORDER BY name"
@@ -139,8 +139,11 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_college_"):
 
-            student_push(context, data)
-            college_id = data.split("_")[2]
+            parts = data.split("_")
+            if len(parts) < 3:
+                return True
+
+            college_id = parts[2]
 
             departments = conn.execute(
                 "SELECT * FROM departments WHERE college_id=%s ORDER BY name",
@@ -162,8 +165,11 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_department_"):
 
-            student_push(context, data)
-            department_id = data.split("_")[2]
+            parts = data.split("_")
+            if len(parts) < 3:
+                return True
+
+            department_id = parts[2]
 
             years = conn.execute(
                 "SELECT * FROM years WHERE department_id=%s ORDER BY name",
@@ -185,8 +191,11 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_year_"):
 
-            student_push(context, data)
-            year_id = data.split("_")[2]
+            parts = data.split("_")
+            if len(parts) < 3:
+                return True
+
+            year_id = parts[2]
 
             levels = conn.execute(
                 "SELECT * FROM levels WHERE year_id=%s ORDER BY name",
@@ -208,8 +217,11 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_level_"):
 
-            student_push(context, data)
-            level_id = data.split("_")[2]
+            parts = data.split("_")
+            if len(parts) < 3:
+                return True
+
+            level_id = parts[2]
 
             subjects = conn.execute(
                 "SELECT * FROM subjects WHERE level_id=%s ORDER BY name",
@@ -231,8 +243,11 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_subject_"):
 
-            student_push(context, data)
-            subject_id = data.split("_")[2]
+            parts = data.split("_")
+            if len(parts) < 3:
+                return True
+
+            subject_id = parts[2]
 
             contents = conn.execute(
                 "SELECT * FROM contents WHERE subject_id=%s ORDER BY id DESC",
@@ -259,7 +274,11 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_file_"):
 
-            content_id = data.split("_")[2]
+            parts = data.split("_")
+            if len(parts) < 3:
+                return True
+
+            content_id = parts[2]
 
             content = conn.execute(
                 "SELECT * FROM contents WHERE id=%s",
@@ -276,18 +295,8 @@ async def student_handler(query, context, get_db):
                 await query.answer("الملف غير موجود على السيرفر", show_alert=True)
                 return True
 
-            await safe_edit(query, "📤 جاري إرسال الملف...", [])
-
             with open(file_path, "rb") as f:
                 await context.bot.send_document(query.message.chat_id, f)
-
-            await context.bot.send_message(
-                query.message.chat_id,
-                "⬅ رجوع",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅ رجوع", callback_data="student_back")]]
-                )
-            )
 
             return True
 
