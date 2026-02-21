@@ -32,6 +32,15 @@ class DBWrapper:
         self.cursor.close()
         self.conn.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc:
+            self.conn.rollback()
+        else:
+            self.conn.commit()
+        self.close()
 
 def get_db():
     return DBWrapper()
