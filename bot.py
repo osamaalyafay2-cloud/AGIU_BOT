@@ -19,8 +19,8 @@ from telegram.ext import (
 
 from werkzeug.security import check_password_hash
 from student import student_start, register_student_handlers,student_handler
-import asyncio
-from werkzeug.utils import secure_filename
+
+
 # ======================================================
 # إعدادات
 # ======================================================
@@ -29,9 +29,6 @@ from werkzeug.utils import secure_filename
 TOKEN = os.environ.get("TOKEN")
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 LOGIN_USERNAME, LOGIN_PASSWORD = range(2)
 CREATE_SUBJECT_NAME = 100
@@ -228,28 +225,21 @@ async def receive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not file:
             return
 
-        telegram_file = await context.bot.get_file(file.file_id)
-
-        file_name = secure_filename(
-            getattr(file, "file_name", f"{file.file_id}.dat")
-        )
-
-        save_path = os.path.join(UPLOAD_FOLDER, file_name)
-
-        await telegram_file.download_to_drive(save_path)
-
+        # 🔥 هنا الفرق الحقيقي
+        file_id = file.file_id
         mime = getattr(file, "mime_type", "unknown")
         size = getattr(file, "file_size", 0)
+        title = getattr(file, "file_name", f"{file_id}.dat")
 
         conn.execute("""
             INSERT INTO contents
-            (title, description, type, file_path, file_size, mime_type, subject_id)
+            (title, description, type, file_id, file_size, mime_type, subject_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
-            file_name,
+            title,
             "",
             "file",
-            save_path,
+            file_id,
             size,
             mime,
             subject_id
@@ -446,8 +436,7 @@ async def render_upload_subjects(query, context, conn):
         return
 
     # تخزين نقطة الرجوع
-    context.user_data["nav_stack"].append("admin_panel")
-
+    push_stack(context, "admin_panel")
     keyboard = [
         [
             InlineKeyboardButton(f"📘 {s['name']}",callback_data=f"select_upload_{s['id']}"),
@@ -512,7 +501,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text("❌ غير مصرح لك.")
                 return
 
-            context.user_data["nav_stack"].append("admin_panel")
+            push_stack(context, "my_subjects")
 
             subjects = conn.execute("""
                 SELECT s.*
@@ -549,7 +538,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             subject_id = int(data.split("_")[2])
             context.user_data["upload_subject"] = subject_id
-            context.user_data["nav_stack"].append("upload_file")
+            push_stack(context, "upload_file")
 
             await query.edit_message_text(
                 "📎 أرسل الآن الملف.",
@@ -562,12 +551,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data.startswith("subject_"):
 
             subject_id = int(data.split("_")[1])
-            context.user_data["nav_stack"].append("my_subjects")
+            push_stack(context, "my_subjects")
 
             await render_subject_files(query, context, conn, subject_id)
 
         # ==========================
-        # إرسال ملف
+        # إرسال ملف (🔥 يعتمد على file_id)
         # ==========================
         elif data.startswith("file_"):
 
@@ -582,24 +571,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.answer("الملف غير موجود", show_alert=True)
                 return
 
-            context.user_data["nav_stack"].append(f"subject_{content['subject_id']}")
+            push_stack(context, f"subject_{content['subject_id']}")
 
-            file_path = content["file_path"]
-            mime = content["mime_type"] or ""
+            try:
+                await query.edit_message_text("📤 جاري إرسال الملف...")
+            except:
+                pass
 
-            if not os.path.exists(file_path):
-                await query.answer("الملف غير موجود على السيرفر", show_alert=True)
+            file_id = content.get("file_id")
+            if not file_id:
+                await query.answer("الملف غير متوافق مع النظام الجديد.", show_alert=True)
                 return
+            mime = content.get("mime_type", "") or ""
 
-            await query.edit_message_text("📤 جاري إرسال الملف...")
-
-            with open(file_path, "rb") as f:
-                if mime.startswith("image"):
-                    await context.bot.send_photo(query.message.chat_id, f)
-                elif mime.startswith("video"):
-                    await context.bot.send_video(query.message.chat_id, f)
-                else:
-                    await context.bot.send_document(query.message.chat_id, f)
+            if mime.startswith("image"):
+                await context.bot.send_photo(
+                    chat_id=query.message.chat_id,
+                    photo=file_id
+                )
+            elif mime.startswith("video"):
+                await context.bot.send_video(
+                    chat_id=query.message.chat_id,
+                    video=file_id
+                )
+            else:
+                await context.bot.send_document(
+                    chat_id=query.message.chat_id,
+                    document=file_id
+                )
 
             await context.bot.send_message(
                 query.message.chat_id,
@@ -645,25 +644,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("🚪 تم تسجيل الخروج بنجاح.")
 
         # ==========================
-        # الرجوع للرئيسية
-        # ==========================
-        elif data == "main":
-
-            context.user_data["nav_stack"] = []
-
-            colleges = conn.execute("SELECT * FROM colleges").fetchall()
-
-            keyboard = [
-                [InlineKeyboardButton(c["name"], callback_data=f"college_{c['id']}")]
-                for c in colleges
-            ]
-
-            await query.edit_message_text(
-                "📚 اختر الكلية:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
-        # ==========================
         # إنشاء مادة
         # ==========================
         elif data == "create_subject":
@@ -676,39 +656,39 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         # ==========================
-        # حذف ملف
+        # حذف ملف (🔥 بدون حذف من السيرفر)
         # ==========================
         elif data.startswith("delete_file_"):
 
             content_id = int(data.split("_")[2])
 
-            content = conn.execute(
-                "SELECT * FROM contents WHERE id=%s",
-                (content_id,)
-            ).fetchone()
-
-            if not content:
-                await query.answer("الملف غير موجود", show_alert=True)
+            user = get_logged_user(context, conn)
+            if not user:
+                await query.edit_message_text("❌ غير مصرح لك.")
                 return
 
-            try:
-                if os.path.exists(content["file_path"]):
-                    os.remove(content["file_path"])
-            except OSError:
-                pass
+            allowed = conn.execute("""
+                SELECT c.id
+                FROM contents c
+                JOIN subjects s ON c.subject_id = s.id
+                JOIN levels l ON s.level_id = l.id
+                JOIN user_permissions up ON up.level_id = l.id
+                WHERE c.id=%s AND up.user_id=%s
+            """, (content_id, user["id"])).fetchone()
+
+            if not allowed:
+                await query.edit_message_text("⛔ لا تملك صلاحية حذف هذا الملف.")
+                return
 
             conn.execute("DELETE FROM contents WHERE id=%s", (content_id,))
             conn.commit()
 
             await query.edit_message_text(
                 "✅ تم حذف الملف بنجاح.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⬅ رجوع", callback_data=f"subject_{content['subject_id']}")]
-                ])
+                reply_markup=InlineKeyboardMarkup(back_button())
             )
-
         # ==========================
-        # حذف مادة (مع تحقق صلاحيات)
+        # حذف مادة
         # ==========================
         elif data.startswith("delete_subject_"):
 
@@ -719,31 +699,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text("❌ غير مصرح لك.")
                 return
 
+    # تحقق أمني: هل هذه المادة ضمن صلاحيات المستخدم؟
             allowed = conn.execute("""
                 SELECT s.id
                 FROM subjects s
                 JOIN levels l ON s.level_id = l.id
                 JOIN user_permissions up ON up.level_id = l.id
                 WHERE s.id=%s AND up.user_id=%s
-            """, (subject_id, user["id"])).fetchone()
+                """, (subject_id, user["id"])).fetchone()
 
             if not allowed:
                 await query.edit_message_text("⛔ لا تملك صلاحية حذف هذه المادة.")
                 return
 
-            files = conn.execute(
-                "SELECT * FROM contents WHERE subject_id=%s",
-                (subject_id,)
-            ).fetchall()
-
-            for f in files:
-                try:
-                    if os.path.exists(f["file_path"]):
-                        os.remove(f["file_path"])
-                except OSError:
-                    pass
-
-            conn.execute("DELETE FROM contents WHERE subject_id=%s", (subject_id,))
+    # تنفيذ الحذف بعد التأكد
             conn.execute("DELETE FROM subjects WHERE id=%s", (subject_id,))
             conn.commit()
 
@@ -756,7 +725,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     finally:
         conn.close()
-
 
 
 # ======================================================
