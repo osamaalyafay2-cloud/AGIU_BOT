@@ -7,6 +7,9 @@ import psycopg2
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set")
+
 conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
@@ -65,13 +68,15 @@ CREATE TABLE IF NOT EXISTS subjects (
 )
 """)
 
+# ✅ تم تعديل الجدول ليعتمد على file_id بدلاً من file_path
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS contents (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
     type TEXT NOT NULL,
-    file_path TEXT NOT NULL,
+    file_id TEXT NOT NULL,
     file_size INTEGER,
     mime_type TEXT,
     subject_id INTEGER NOT NULL,
