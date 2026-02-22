@@ -87,10 +87,8 @@ async def student_handler(query, context, get_db):
 
     await query.answer()
 
-    # معالجة الرجوع
     if data == "student_back":
         data = student_pop(context)
-
     else:
         student_push(context, data)
 
@@ -130,7 +128,7 @@ async def student_handler(query, context, get_db):
                 "📚 نظام أرشفة جامعي\n\n"
                 "اختر الكلية ثم القسم ثم السنة ثم المستوى "
                 "ثم المادة لتحميل الملفات بسهولة."
-                "\n\nهندسة وتصميم:\n Eng.Ossama Omar\t",
+                "\n\nتصميم وبرمجه : \nEng.Ossama Omar",
                 keyboard
             )
             return True
@@ -140,11 +138,7 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_college_"):
 
-            parts = data.split("_")
-            if len(parts) < 3:
-                return True
-
-            college_id = parts[2]
+            college_id = data.split("_")[2]
 
             departments = conn.execute(
                 "SELECT * FROM departments WHERE college_id=%s ORDER BY name",
@@ -166,11 +160,7 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_department_"):
 
-            parts = data.split("_")
-            if len(parts) < 3:
-                return True
-
-            department_id = parts[2]
+            department_id = data.split("_")[2]
 
             years = conn.execute(
                 "SELECT * FROM years WHERE department_id=%s ORDER BY name",
@@ -192,11 +182,7 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_year_"):
 
-            parts = data.split("_")
-            if len(parts) < 3:
-                return True
-
-            year_id = parts[2]
+            year_id = data.split("_")[2]
 
             levels = conn.execute(
                 "SELECT * FROM levels WHERE year_id=%s ORDER BY name",
@@ -218,11 +204,7 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_level_"):
 
-            parts = data.split("_")
-            if len(parts) < 3:
-                return True
-
-            level_id = parts[2]
+            level_id = data.split("_")[2]
 
             subjects = conn.execute(
                 "SELECT * FROM subjects WHERE level_id=%s ORDER BY name",
@@ -244,11 +226,7 @@ async def student_handler(query, context, get_db):
         # ===============================
         if data.startswith("student_subject_"):
 
-            parts = data.split("_")
-            if len(parts) < 3:
-                return True
-
-            subject_id = parts[2]
+            subject_id = data.split("_")[2]
 
             contents = conn.execute(
                 "SELECT * FROM contents WHERE subject_id=%s ORDER BY id DESC",
@@ -271,15 +249,11 @@ async def student_handler(query, context, get_db):
             return True
 
         # ===============================
-        # تحميل ملف
+        # تحميل ملف (يدعم file_id و file_path)
         # ===============================
         if data.startswith("student_file_"):
 
-            parts = data.split("_")
-            if len(parts) < 3:
-                return True
-
-            content_id = parts[2]
+            content_id = data.split("_")[2]
 
             content = conn.execute(
                 "SELECT * FROM contents WHERE id=%s",
@@ -290,15 +264,33 @@ async def student_handler(query, context, get_db):
                 await query.answer("الملف غير موجود", show_alert=True)
                 return True
 
-            file_path = content["file_path"]
+            file_id = content.get("file_id")
+            mime = content.get("mime_type", "") or ""
 
-            if not file_path or not os.path.exists(file_path):
-                await query.answer("الملف غير موجود على السيرفر", show_alert=True)
+            # ====== النظام الجديد (Telegram Cloud) ======
+            if file_id:
+                try:
+                    if mime.startswith("image"):
+                        await context.bot.send_photo(query.message.chat_id, file_id)
+                    elif mime.startswith("video"):
+                        await context.bot.send_video(query.message.chat_id, file_id)
+                    else:
+                        await context.bot.send_document(query.message.chat_id, file_id)
+                except Exception as e:
+                    print("Send error:", e)
+                    await query.answer("حدث خطأ أثناء الإرسال", show_alert=True)
+
                 return True
 
-            with open(file_path, "rb") as f:
-                await context.bot.send_document(query.message.chat_id, f)
+            # ====== دعم الملفات القديمة ======
+            file_path = content.get("file_path")
 
+            if file_path and os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    await context.bot.send_document(query.message.chat_id, f)
+                return True
+
+            await query.answer("الملف غير متوفر حالياً", show_alert=True)
             return True
 
         return False
