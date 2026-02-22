@@ -11,8 +11,9 @@ from routes.subjects import subjects_bp
 from routes.contents import contents_bp
 from routes.auth import auth_bp
 
+
 # ==========================================
-# إنشاء تطبيق لوحة الإدارة فقط
+# إنشاء التطبيق
 # ==========================================
 
 app = Flask(__name__)
@@ -20,26 +21,20 @@ app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.environ.get("SECRET_KEY", "super_secret_key")
 
-# ==========================================
-# تسجيل Blueprints الخاصة بالإدارة
-# ==========================================
-
-app.register_blueprint(auth_bp, url_prefix="/admin")
-app.register_blueprint(colleges_bp, url_prefix="/admin")
-app.register_blueprint(departments_bp, url_prefix="/admin")
-app.register_blueprint(years_bp, url_prefix="/admin")
-app.register_blueprint(levels_bp, url_prefix="/admin")
-app.register_blueprint(subjects_bp, url_prefix="/admin")
-app.register_blueprint(contents_bp, url_prefix="/admin")
-app.register_blueprint(admin_users_bp, url_prefix="/admin")
 
 # ==========================================
-# صفحة رئيسية بسيطة
+# تسجيل الـ Blueprints
 # ==========================================
 
-@app.route("/")
-def home():
-    return "Admin Panel Running Successfully"
+app.register_blueprint(auth_bp)
+app.register_blueprint(colleges_bp)
+app.register_blueprint(departments_bp)
+app.register_blueprint(years_bp)
+app.register_blueprint(levels_bp)
+app.register_blueprint(subjects_bp)
+app.register_blueprint(contents_bp)
+app.register_blueprint(admin_users_bp)
+
 
 # ==========================================
 # تشغيل محلي فقط
