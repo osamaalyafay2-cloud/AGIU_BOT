@@ -15,6 +15,13 @@ class DBWrapper:
         )
         self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
 
+        # 🔥 إضافة العمود إذا لم يكن موجودًا
+        self.cursor.execute("""
+            ALTER TABLE contents
+            ADD COLUMN IF NOT EXISTS file_id TEXT;
+        """)
+        self.conn.commit()
+    
     def execute(self, query, params=None):
         self.cursor.execute(query, params or ())
         return self
