@@ -14,6 +14,14 @@ conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 # ===============================================
+# حذف جدول contents لإعادة بنائه بنظام file_id
+# ===============================================
+
+cursor.execute("""
+DROP TABLE IF EXISTS contents CASCADE;
+""")
+
+# ===============================================
 # الجداول الأساسية للنظام الأكاديمي
 # ===============================================
 
@@ -21,7 +29,7 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS colleges (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL
-)
+);
 """)
 
 cursor.execute("""
@@ -32,7 +40,7 @@ CREATE TABLE IF NOT EXISTS departments (
     FOREIGN KEY (college_id)
         REFERENCES colleges(id)
         ON DELETE CASCADE
-)
+);
 """)
 
 cursor.execute("""
@@ -43,7 +51,7 @@ CREATE TABLE IF NOT EXISTS years (
     FOREIGN KEY (department_id)
         REFERENCES departments(id)
         ON DELETE CASCADE
-)
+);
 """)
 
 cursor.execute("""
@@ -54,7 +62,7 @@ CREATE TABLE IF NOT EXISTS levels (
     FOREIGN KEY (year_id)
         REFERENCES years(id)
         ON DELETE CASCADE
-)
+);
 """)
 
 cursor.execute("""
@@ -65,25 +73,28 @@ CREATE TABLE IF NOT EXISTS subjects (
     FOREIGN KEY (level_id)
         REFERENCES levels(id)
         ON DELETE CASCADE
-)
+);
 """)
 
-# ✅ تم تعديل الجدول ليعتمد على file_id بدلاً من file_path
+# ===============================================
+# جدول المحتويات الجديد (يعتمد على file_id)
+# ===============================================
 
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS contents (
+CREATE TABLE contents (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
     type TEXT NOT NULL,
     file_id TEXT NOT NULL,
-    file_size INTEGER,
+    file_size BIGINT,
     mime_type TEXT,
     subject_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (subject_id)
         REFERENCES subjects(id)
         ON DELETE CASCADE
-)
+);
 """)
 
 # ===============================================
@@ -96,7 +107,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('super_admin','user'))
-)
+);
 """)
 
 cursor.execute("""
@@ -110,7 +121,7 @@ CREATE TABLE IF NOT EXISTS user_permissions (
     FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
     FOREIGN KEY (year_id) REFERENCES years(id) ON DELETE CASCADE,
     FOREIGN KEY (level_id) REFERENCES levels(id) ON DELETE CASCADE
-)
+);
 """)
 
 # ===============================================
@@ -119,32 +130,32 @@ CREATE TABLE IF NOT EXISTS user_permissions (
 
 cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_departments_college
-ON departments(college_id)
+ON departments(college_id);
 """)
 
 cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_years_department
-ON years(department_id)
+ON years(department_id);
 """)
 
 cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_levels_year
-ON levels(year_id)
+ON levels(year_id);
 """)
 
 cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_subjects_level
-ON subjects(level_id)
+ON subjects(level_id);
 """)
 
 cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_contents_subject
-ON contents(subject_id)
+ON contents(subject_id);
 """)
 
 cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_permissions_user
-ON user_permissions(user_id)
+ON user_permissions(user_id);
 """)
 
 # ===============================================
@@ -155,4 +166,4 @@ conn.commit()
 cursor.close()
 conn.close()
 
-print("PostgreSQL database initialized successfully")
+print("Database initialized successfully with file_id storage system.")
